@@ -8,7 +8,11 @@ jwt = JWTManager()
 
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        template_folder="templates",
+        static_folder="static"
+    )
 
     # Database configuration
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
@@ -31,8 +35,9 @@ def create_app():
     db.init_app(app)
     jwt.init_app(app)
 
-    # Import models so SQLAlchemy knows about the tables
+    # Import models
     from app.auth.models.user import User
+    from app.auth.models.login_attempt import LoginAttempt
 
     # Import routes
     from app.auth.routes import auth_bp
@@ -42,11 +47,23 @@ def create_app():
     from app.reports.routes import reports_bp
 
     # Register routes
-    app.register_blueprint(auth_bp, url_prefix="/api/auth")
-    app.register_blueprint(registration_bp, url_prefix="/api/registration")
-    app.register_blueprint(voting_bp, url_prefix="/api/voting")
-    app.register_blueprint(audit_bp, url_prefix="/api/audit")
-    app.register_blueprint(reports_bp, url_prefix="/api/reports")
+    app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(
+        registration_bp,
+        url_prefix="/api/registration"
+    )
+    app.register_blueprint(
+        voting_bp,
+        url_prefix="/api/voting"
+    )
+    app.register_blueprint(
+        audit_bp,
+        url_prefix="/api/audit"
+    )
+    app.register_blueprint(
+        reports_bp,
+        url_prefix="/api/reports"
+    )
 
     # Create database tables
     with app.app_context():
