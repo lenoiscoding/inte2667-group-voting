@@ -1,52 +1,35 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
 
     <title>Election System Login</title>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
-</head>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/login.css') }}"
+    />
+  </head>
 
-<body>
-
+  <body>
     <div class="login-container">
+      <div class="login-box">
+        <h1>Election System</h1>
+        <p class="subtitle">Secure Login</p>
 
-        <div class="login-box">
+        <form method="POST" action="/auth/login">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" />
 
-            <h1>Election System</h1>
-            <p class="subtitle">Secure Login</p>
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" />
 
-            <form>
-
-                <div class="input-group">
-                    <label for="username">Username</label>
-                    <input
-                        type="text"
-                        id="username"
-                        placeholder="Enter your username"
-                    >
-                </div>
-
-                <div class="input-group">
-                    <label for="password">Password</label>
-                    <input
-                        type="password"
-                        id="password"
-                        placeholder="Enter your password"
-                    >
-                </div>
-
-                <button type="button">Login</button>
-
-            </form>
-
-        </div>
-
+          <button type="submit">Login</button>
+        </form>
+        <div id="login-message" style="display: none">{{ message }}</div>
+      </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/login.js') }}"></script>
-
-</body>
+  </body>
 </html>

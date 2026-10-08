@@ -22,6 +22,11 @@ class LoginAttempt(db.Model):
         nullable=False
     )
 
+    source_ip = db.Column(
+        db.String(45),
+        nullable=False
+    )
+
     outcome = db.Column(
         db.String(20),
         nullable=False
