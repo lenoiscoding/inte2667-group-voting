@@ -50,7 +50,7 @@ def create_app():
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(
         registration_bp,
-        url_prefix="/api/registration"
+        url_prefix="/registration"
     )
     app.register_blueprint(
         voting_bp,

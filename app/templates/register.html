@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <title>Election System Registration</title>
+
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/login.css') }}"
+    />
+  </head>
+
+  <body>
+    <div class="login-container">
+      <div class="login-box">
+        <h1>Election System</h1>
+        <p class="subtitle">Voter Registration</p>
+
+        {% if message %}
+        <p style="text-align: center; color: {{ '#2e7d32' if success else '#c62828' }}">
+          {{ message }}
+        </p>
+        {% endif %}
+
+        <form method="POST" action="/registration/register">
+          <label for="full_name">Full name</label>
+          <input type="text" id="full_name" name="full_name" required />
+
+          <label for="date_of_birth">Date of birth</label>
+          <input type="date" id="date_of_birth" name="date_of_birth" required />
+
+          <label for="address">Address</label>
+          <input type="text" id="address" name="address" required />
+
+          <label for="id_number">ID number</label>
+          <input type="text" id="id_number" name="id_number" required />
+
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required />
+
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" minlength="12" required />
+
+          <button type="submit">Register</button>
+        </form>
+
+        <p style="text-align: center"><a href="/auth/login">Already registered? Log in</a></p>
+      </div>
+    </div>
+  </body>
+</html>
