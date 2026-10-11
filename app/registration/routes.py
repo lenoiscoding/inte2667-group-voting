@@ -35,7 +35,9 @@ def register():
     password = request.form.get("password") or ""
     full_name = (request.form.get("full_name") or "").strip()
     address = (request.form.get("address") or "").strip()
-    id_number = (request.form.get("id_number") or "").strip().upper()
+    id_document_number = (
+        request.form.get("id_document_number") or ""
+    ).strip().upper()
     dob_raw = request.form.get("date_of_birth") or ""
 
     def fail(message, status=400):
@@ -43,7 +45,7 @@ def register():
             "register.html", message=message, success=False
         ), status
 
-    if not all([username, password, full_name, address, id_number, dob_raw]):
+    if not all([username, password, full_name, address, id_document_number, dob_raw]):
         return fail("All fields are required.")
 
     if len(password) < MIN_PASSWORD_LENGTH:
@@ -62,7 +64,9 @@ def register():
     # Duplicate registration check
     already_registered = (
         User.query.filter_by(username=username).first()
-        or VoterRecord.query.filter_by(id_number=id_number).first()
+        or VoterRecord.query.filter_by(
+            id_document_number=id_document_number
+        ).first()
     )
     if already_registered:
         return fail("These details are already registered.", 409)
@@ -76,20 +80,25 @@ def register():
         db.session.add(user)
         db.session.flush()
 
-        db.session.add(VoterRecord(
+        voter = VoterRecord(
             user_id=user.user_id,
             full_name=full_name,
             date_of_birth=dob,
             address=address,
-            id_number=id_number
-        ))
+            id_document_number=id_document_number
+        )
+        db.session.add(voter)
         db.session.commit()
+        voter_ref = voter.voter_ref
     except IntegrityError:
         db.session.rollback()
         return fail("These details are already registered.", 409)
 
     return render_template(
         "register.html",
-        message="Registration successful. You can now log in.",
+        message=(
+            "Registration successful. Your voter reference is "
+            f"{voter_ref}. Keep it safe. You can now log in."
+        ),
         success=True
     ), 201

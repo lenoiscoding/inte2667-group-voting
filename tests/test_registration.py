@@ -8,7 +8,7 @@ VALID = {
     "full_name": "Test Voter",
     "date_of_birth": "1990-05-17",
     "address": "1 Example St, Melbourne VIC 3000",
-    "id_number": "ID123456",
+    "id_document_number": "ID123456",
     "username": "voter1",
     "password": "a-long-enough-password",
 }
@@ -39,7 +39,7 @@ def test_register_creates_user_and_record(client):
     assert VoterRecord.query.filter_by(user_id=user.user_id).count() == 1
 
 
-def test_duplicate_id_number_rejected(client):
+def test_duplicate_id_document_number_rejected(client):
     client.post("/registration/register", data=VALID)
     second = {**VALID, "username": "voter2"}
     assert client.post("/registration/register", data=second).status_code == 409
@@ -48,7 +48,7 @@ def test_duplicate_id_number_rejected(client):
 
 def test_duplicate_username_rejected(client):
     client.post("/registration/register", data=VALID)
-    second = {**VALID, "id_number": "ID999999"}
+    second = {**VALID, "id_document_number": "ID999999"}
     assert client.post("/registration/register", data=second).status_code == 409
 
 
@@ -66,3 +66,20 @@ def test_short_password_rejected(client):
 def test_missing_field_rejected(client):
     data = {k: v for k, v in VALID.items() if k != "address"}
     assert client.post("/registration/register", data=data).status_code == 400
+
+
+def test_voter_ref_is_generated_and_random(client):
+    client.post("/registration/register", data=VALID)
+    second = {**VALID, "username": "voter2", "id_document_number": "ID777777"}
+    client.post("/registration/register", data=second)
+
+    refs = [v.voter_ref for v in VoterRecord.query.all()]
+    assert len(refs) == 2
+    assert refs[0] != refs[1]
+    assert all(r.startswith("V") and len(r) == 17 for r in refs)
+
+
+def test_voter_cannot_choose_own_voter_ref(client):
+    data = {**VALID, "voter_ref": "VCHOSENBYUSER0000"}
+    client.post("/registration/register", data=data)
+    assert VoterRecord.query.first().voter_ref != "VCHOSENBYUSER0000"
