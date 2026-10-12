@@ -1,7 +1,7 @@
 # Storage Subsystem – Part Three Implementation Guide
 
-**Student:** DonCarl0s04\
-**Repo:** DonCarl0s04/a3-secure-voting\
+**Student:** s4129654_Don_Carlos_Porte\
+**Repo:** inte2667-group-voting\
 **Subsystem:** Data Storage & Audit
 
 ---
