@@ -1,6 +1,6 @@
 """
 storage.py - storage part of our A3 voting system (Part 3)
-DonCarl0s04
+s4129654 - Don Carlos Porte
 
 This file has my 4 storage requirements:
   Req 8  - encrypt voter details (name, address, DOB) with AES-256-GCM
