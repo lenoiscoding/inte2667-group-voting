@@ -1,7 +1,7 @@
 Storage Subsystem – Part Three Implementation Guide
 
-Student: s4129654_Don_Carlos_Porte
-Repo: inte2667-group-voting
+Student: s4129654_Don_Carlos_Porte/
+Repo: inte2667-group-voting/
 Subsystem: Data Storage & Audit
 ⸻
 
