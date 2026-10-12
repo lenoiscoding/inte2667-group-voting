@@ -1,163 +1,76 @@
-# Storage Subsystem – Part Three Implementation Guide
+# Storage (Req 8–11)
 
-**Student:** s4129654_Don_Carlos_Porte\
-**Repo:** inte2667-group-voting\
-**Subsystem:** Data Storage & Audit
+This is my part of our A3 voting system. I did the **storage** side, which covers 4 of our requirements from Part 1. Everything is in `storage.py` and the tests are in `test_storage.py`.
 
----
+I used SQLite for this so it runs straight away without needing a database server. The main app uses PostgreSQL, but the ideas are the same.
 
-## Overview
+## What's covered
 
-This subsystem implements 4 security requirements from Part One of the assignment, covering all database-level and backup-level security controls for the Electronic Voting Platform.
+| Req | What it does | Priority / Complexity |
+| --- | --- | --- |
+| 8 | Encrypts voter details (name, address, DOB) with AES-256-GCM before saving them | High / High |
+| 9 | Audit log where each entry is linked to the one before it with a SHA-256 hash, so edits or deletes can be detected | High / High |
+| 10 | Ballots are saved in their own table with no voter ID, IP or time, so you can't tell who voted for what | High / High |
+| 11 | Encrypted backups of the database, each with a `.sha256` checksum file | High / High |
 
----
-
-## Requirements Implemented
-
-| Req ID | Description | Complexity | File |
-| --- | --- | --- | --- |
-| **8** | AES-256-GCM encryption of voter PII at rest | High | `storage.py` |
-| **9** | Append-only SHA-256 hash-chained audit log | Medium | `storage.py` |
-| **10** | Decoupled ballot table (no elector foreign keys) | High | `storage.py` |
-| **11** | Encrypted DB snapshots with SHA-256 checksums | High | `storage.py` |
-
----
-
-## File Structure
+## Files
 
 ```
-a3-secure-voting/
-├── storage/
-│   ├── storage.py          ← Core implementation (all 4 requirements)
-│   ├── test_storage.py     ← Unit tests (5 tests per requirement = 20 total)
-│   └── README.md           ← This file
-└── .github/
-    └── workflows/
-        └── storage-ci.yml  ← GitHub Actions CI pipeline
+storage/
+├── storage.py          - the code for Req 8, 9, 10 and 11
+├── test_storage.py     - 20 tests (5 per requirement)
+├── requirements.txt    - cryptography + pytest
+├── ERD_with_Storage.png / .drawio  - our ERD with the storage tables
+└── README.md
 ```
 
----
+There's also `.github/workflows/storage-ci.yml` in the root of the repo, which runs the tests on GitHub (see below).
 
-## How to Run Locally
-
-### 1\. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2\. Run Unit Tests
+## How to run it
 
 ```bash
 cd storage
+pip install -r requirements.txt
 pytest test_storage.py -v
 ```
 
-### 3\. Run Tests with Coverage Report
+You should get `20 passed`. To see the coverage as well:
 
 ```bash
-cd storage
-pytest test_storage.py --cov=storage --cov-report=term-missing -v
+pytest test_storage.py --cov=storage --cov-report=term-missing
 ```
 
----
+(you need `pip install pytest-cov` for that one)
 
-## Unit Test Summary
+## How each one works
 
-### Req 8 – AES-256-GCM PII Encryption (5 tests)
+**Req 8 – encryption.** Each field is encrypted on its own with AES-256-GCM using a new random 12-byte nonce, so the same name encrypted twice looks different in the database. I picked GCM over CBC + HMAC (the other option in our Part 2) because it also checks for tampering: if someone changes the stored value even slightly, decryption just fails. The key comes from the `AES_KEY` environment variable. If it isn't set, a fixed test key is used, which is only OK because this is a prototype.
 
-| Test ID | Test Name | What It Proves |
-| --- | --- | --- |
-| T8-01 | `test_encrypted_fields_are_not_plaintext` | Raw DB values contain no readable PII |
-| T8-02 | `test_decrypt_returns_correct_plaintext` | Decryption recovers exact original values |
-| T8-03 | `test_different_nonces_produce_different_ciphertexts` | Each encryption uses a unique nonce |
-| T8-04 | `test_wrong_key_cannot_decrypt` | Wrong key raises exception (GCM auth tag fails) |
-| T8-05 | `test_nonexistent_elector_returns_none` | Safe handling of missing elector ID |
+**Req 9 – audit log.** Every row stores its own hash and the hash of the row before it. The hash covers all the columns plus the previous hash, so changing or deleting an old row breaks every hash after it. `verify_audit_chain()` goes through the whole log and tells you where it broke. One limitation: SQLite can't stop someone running UPDATE or DELETE directly, so this *detects* tampering rather than preventing it. (The Postgres version in the main app also has triggers that block it.)
 
-### Req 9 – Hash-Chained Audit Log (5 tests)
+**Req 10 – anonymous ballots.** The voter gets a one-time token, votes with it, and the token is deleted in the same transaction that saves the ballot. The `ballot_box` table has no voter ID, IP address or timestamp, so after that there's nothing left to connect a ballot to a person. `has_voted` is set when the token is given out, so nobody can get a second one.
 
-| Test ID | Test Name | What It Proves |
-| --- | --- | --- |
-| T9-01 | `test_single_event_chain_is_valid` | Single entry chain passes verification |
-| T9-02 | `test_multiple_events_chain_is_valid` | Multiple entries chain correctly |
-| T9-03 | `test_modified_row_breaks_chain` | Row tampering is detected |
-| T9-04 | `test_empty_log_passes_verification` | Empty log is a valid chain |
-| T9-05 | `test_audit_entries_are_never_deleted` | Deletion of a row breaks the chain |
+**Req 11 – backups.** `create_encrypted_snapshot()` uses SQLite's `backup()` to take a copy while the db is still in use (just copying the file can give you a corrupted copy), encrypts it with AES-256-GCM and writes a SHA-256 checksum next to it. The temp copy is deleted straight away so there's never an unencrypted backup on disk. When restoring, you can check the checksum first, and GCM checks the file again when it decrypts.
 
-### Req 10 – Decoupled Ballot Table (5 tests)
+## Tests
 
-| Test ID | Test Name | What It Proves |
-| --- | --- | --- |
-| T10-01 | `test_ballot_box_has_no_elector_id_column` | ballot_box has no identity columns |
-| T10-02 | `test_token_deleted_after_vote_submission` | Ephemeral token destroyed after use |
-| T10-03 | `test_ballot_stored_without_voter_link` | No elector ID in stored ballot row |
-| T10-04 | `test_cannot_vote_twice` | Reused token raises RuntimeError |
-| T10-05 | `test_cannot_issue_second_token_after_voting` | Double-token issuance is blocked |
+| Req | Tests |
+| --- | --- |
+| 8 | data in the db isn't readable · decrypt gives back the original · same input encrypts differently each time · wrong key fails · missing voter returns None |
+| 9 | one entry passes · several entries pass · editing a row is caught · empty log passes · deleting a row is caught |
+| 10 | ballot table has no voter columns · token deleted after voting · ballot row has no voter ID · can't reuse a token · can't get a second token |
+| 11 | both files get created · backup isn't a readable SQLite file · checksum passes · changing one byte fails the checksum · restore gives a working db |
 
-### Req 11 – Encrypted Snapshots (5 tests)
+## CI
 
-| Test ID | Test Name | What It Proves |
-| --- | --- | --- |
-| T11-01 | `test_snapshot_files_are_created` | Both snapshot and checksum files exist |
-| T11-02 | `test_snapshot_is_not_plaintext_sqlite` | Encrypted file has no SQLite magic header |
-| T11-03 | `test_checksum_verification_passes` | SHA-256 matches for untampered snapshot |
-| T11-04 | `test_tampered_snapshot_fails_checksum` | Single byte flip is detected |
-| T11-05 | `test_restore_produces_valid_sqlite_database` | Decrypted restore is a valid SQLite DB |
+`storage-ci.yml` runs on GitHub whenever something in `storage/` changes. It does three things:
 
----
+1. **flake8**, to check code style
+2. **pytest**, which needs at least 80% coverage to pass
+3. **pip-audit**, which checks `requirements.txt` for packages with known vulnerabilities
 
-## Suggested Commit History
+## Things I'd do differently in a real system
 
-Follow this commit order so your contribution history is clean and traceable:
-
-```
-Commit 1:  "req8: init elector table schema with encrypted PII columns"
-Commit 2:  "req8: implement PIIEncryption class with AES-256-GCM encrypt/decrypt"
-Commit 3:  "req8: add insert_elector and fetch_elector_plaintext functions"
-Commit 4:  "test-req8: add 5 unit tests for PII encryption (T8-01 to T8-05)"
-Commit 5:  "req9: implement append-only audit_log table with SHA-256 hash chaining"
-Commit 6:  "req9: implement verify_audit_chain integrity verifier"
-Commit 7:  "test-req9: add 5 unit tests for hash-chained audit log (T9-01 to T9-05)"
-Commit 8:  "req10: implement decoupled ballot_box and ballot_tokens tables"
-Commit 9:  "req10: implement issue_ballot_token and submit_ballot with ephemeral token deletion"
-Commit 10: "test-req10: add 5 unit tests for decoupled ballot submission (T10-01 to T10-05)"
-Commit 11: "req11: implement create_encrypted_snapshot with AES-256-GCM and SHA-256 checksum"
-Commit 12: "req11: implement verify_snapshot_checksum and restore_snapshot"
-Commit 13: "test-req11: add 5 unit tests for encrypted snapshot integrity (T11-01 to T11-05)"
-Commit 14: "ci: add GitHub Actions storage-ci.yml pipeline with lint, test, and pip-audit stages"
-Commit 15: "docs: add README_storage.md with implementation guide and commit history"
-```
-
----
-
-## CI/CD Pipeline
-
-The `.github/workflows/storage-ci.yml` file runs automatically on every push to any file inside `storage/`. It contains three stages:
-
-1. **Lint** – `flake8` static analysis (max line length 100).
-
-2. **Test** – `pytest` with coverage, fails if coverage drops below 80%.
-
-3. **Security** – `pip-audit` scans all installed dependencies for known CVEs.
-
-The pipeline ensures that every commit to the storage subsystem passes all unit tests before it can be merged into the main branch.
-
----
-
-## Key Security Design Decisions
-
-### Req 8 – Why AES-256-GCM?
-
-AES-GCM is an authenticated encryption scheme. The GCM authentication tag ensures that if any byte of the ciphertext is modified, decryption raises an exception automatically. This protects against ciphertext tampering without requiring a separate HMAC calculation.
-
-### Req 9 – Why Hash Chaining?
-
-Each audit row's `row_hash` is computed over its own content PLUS the previous row's hash. This means that modifying, inserting, or deleting any historical row immediately invalidates all subsequent hashes. An attacker cannot rewrite history without recalculating the entire chain.
-
-### Req 10 – Why Two Tables?
-
-Keeping `electors` (identity) and `ballot_box` (votes) in completely separate tables with no foreign key or shared timestamp means there is no database join that can link a voter to their ballot. The ephemeral token that temporarily authorizes submission is deleted the moment the vote is recorded.
-
-### Req 11 – Why Encrypt the Backup?
-
-A database backup stored in plaintext is just as dangerous as the live database. Encrypting the snapshot with the same AES-256-GCM key ensures that even a stolen backup file cannot be read. The SHA-256 checksum companion file ensures the backup has not been silently corrupted or tampered with before restoration.
+- keep the key in a proper key vault instead of an environment variable
+- block UPDATE/DELETE on the audit log at the database level (the main app does this with Postgres triggers)
+- run the backups on a schedule and store them somewhere separate from the database
