@@ -50,3 +50,8 @@ class User(db.Model):
         default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
+
+    totp_secret = db.Column(
+        db.String(32), 
+        nullable=True
+    )
