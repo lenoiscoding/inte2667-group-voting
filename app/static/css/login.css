@@ -96,3 +96,19 @@ button:hover {
 .register-link a:hover {
   text-decoration: underline;
 }
+
+.security-reminder {
+  margin: 20px 0;
+  padding: 12px;
+  background-color: #fff8e1;
+  border: 1px solid #f0d98c;
+  border-radius: 5px;
+  color: #5f4b00;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.security-reminder strong {
+  display: block;
+  margin-bottom: 4px;
+}
