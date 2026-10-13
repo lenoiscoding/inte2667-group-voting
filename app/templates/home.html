@@ -2,10 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Home Page</title>
   </head>
   <body>
     <h1>Home Page</h1>
+
+    <section>
+      <h2>Login Security</h2>
+      {% if previous_successful_login %}
+        <p>
+          Your previous successful login was:
+          <time>{{ previous_successful_login }}</time>
+        </p>
+      {% else %}
+        <p>No previous successful login has been recorded.</p>
+      {% endif %}
+    </section>
 
     <script src="{{ url_for('static', filename='js/session_timeout.js') }}"></script>
   </body>

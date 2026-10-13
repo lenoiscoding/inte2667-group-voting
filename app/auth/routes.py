@@ -15,8 +15,8 @@ def login():
     show_otp = "pending_mfa_user_id" in session
     now = datetime.now(timezone.utc)
 
-    if request.method == "POST":
 
+    if request.method == "POST":
         if "otp" in request.form:
             user_id = session.get("pending_mfa_user_id")
             user = db.session.get(User, user_id) if user_id else None
@@ -24,6 +24,9 @@ def login():
             if user and user.totp_secret and pyotp.TOTP(
                 user.totp_secret
             ).verify(request.form.get("otp", ""), valid_window=1):
+                previous_login = user.last_successful_login
+                user.last_successful_login = now
+                db.session.flush()
 
                 db.session.add(LoginAttempt(
                     user_id=user.user_id,
@@ -36,6 +39,9 @@ def login():
                 session.clear()
                 session["authenticated_user_id"] = user.user_id
                 session["last_activity"] = time.time()
+                session["previous_successful_login"] = (
+                    previous_login.isoformat() if previous_login else None
+                )
 
                 return redirect(url_for("auth.home"))
 
@@ -105,6 +111,9 @@ def login():
     )
 
 
+
+
+
 @auth_bp.route("/home")
 def home():
     user_id = session.get("authenticated_user_id")
@@ -114,7 +123,12 @@ def home():
         session.clear()
         return redirect(url_for("auth.login"))
 
-    return render_template("home.html")
+    previous_login = session.get("previous_successful_login")
+
+    return render_template(
+        "home.html",
+        previous_successful_login=previous_login,
+    )
 
 
 @auth_bp.route("/activity", methods=["POST"])

@@ -38,6 +38,7 @@ def create_app():
     # Import models
     from app.auth.models.user import User
     from app.auth.models.login_attempt import LoginAttempt
+    from app.audit.models import RegistrationChange
 
     # Import routes
     from app.auth.routes import auth_bp
