@@ -18,10 +18,26 @@
         <p class="subtitle">Voter Registration</p>
 
         {% if message %}
-        <p style="text-align: center; color: {{ '#2e7d32' if success else '#c62828' }}">
-          {{ message }}
-        </p>
-        {% endif %}
+{% if message %}
+<p style="text-align: center; color: {{ '#2e7d32' if success else '#c62828' }}">
+  {{ message }}
+</p>
+{% endif %}
+{% if success and qr_code %}
+<h2>Set Up Google Authenticator</h2>
+<p>Scan this QR code using Google Authenticator.</p>
+
+<img
+  src="data:image/png;base64,{{ qr_code }}"
+  alt="Google Authenticator QR code"
+  width="220"
+  height="220"
+/>
+
+<p>Enter the six-digit code when logging in.</p>
+<a href="{{ url_for('auth.login') }}">Go to Login</a>
+
+{% else %}
 
         <form method="POST" action="/registration/register">
           <label for="full_name">Full name</label>
@@ -46,12 +62,22 @@
           <input type="text" id="username" name="username" required />
 
           <label for="password">Password</label>
-          <input type="password" id="password" name="password" minlength="12" required />
+<input
+            type="password"
+            id="password"
+            name="password"
+            minlength="12"
+            required
+          />
 
           <button type="submit">Register</button>
         </form>
 
-        <p style="text-align: center"><a href="/auth/login">Already registered? Log in</a></p>
+<p style="text-align: center">
+          <a href="/auth/login">Already registered? Log in</a>
+        </p>
+
+        {% endif %}
       </div>
     </div>
   </body>

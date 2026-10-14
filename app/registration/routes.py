@@ -1,4 +1,8 @@
 from datetime import date, datetime
+from io import BytesIO
+import base64
+import pyotp
+import qrcode
 
 from flask import Blueprint, jsonify, render_template, request
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +24,17 @@ def _age(dob):
         (today.month, today.day) < (dob.month, dob.day)
     )
 
+def _generate_qr(secret, username):
+    uri = pyotp.TOTP(secret).provisioning_uri(
+        name=username,
+        issuer_name="Election System"
+    )
+
+    buffer = BytesIO()
+    qrcode.make(uri).save(buffer, format="PNG")
+
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
 
 @registration_bp.route("/ping")
 def ping():
@@ -29,7 +44,7 @@ def ping():
 @registration_bp.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
-        return render_template("register.html", message="", success=False)
+        return render_template("register.html", message="", success=False, qr_code=None)
 
     username = (request.form.get("username") or "").strip()
     password = request.form.get("password") or ""
@@ -42,7 +57,7 @@ def register():
 
     def fail(message, status=400):
         return render_template(
-            "register.html", message=message, success=False
+            "register.html", message=message, success=False, qr_code=None
         ), status
 
     if not all([username, password, full_name, address, id_document_number, dob_raw]):
@@ -71,11 +86,14 @@ def register():
     if already_registered:
         return fail("These details are already registered.", 409)
 
+    secret = pyotp.random_base32()
+
     try:
         user = User(
             username=username,
             password_hash=generate_password_hash(password),
-            role="voter"
+            role="voter",
+            totp_secret=secret
         )
         db.session.add(user)
         db.session.flush()
@@ -90,6 +108,8 @@ def register():
         db.session.add(voter)
         db.session.commit()
         voter_ref = voter.voter_ref
+        qr_code = _generate_qr(secret, username)
+
     except IntegrityError:
         db.session.rollback()
         return fail("These details are already registered.", 409)
@@ -97,8 +117,9 @@ def register():
     return render_template(
         "register.html",
         message=(
-            "Registration successful. Your voter reference is "
-            f"{voter_ref}. Keep it safe. You can now log in."
+            f"Registration successful. Your voter reference is "
+            f"{voter_ref}. Keep it safe. Scan the QR code with Google Authenticator."
         ),
-        success=True
+        success=True,
+        qr_code=qr_code
     ), 201
