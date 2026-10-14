@@ -1,0 +1,55 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Registration Details</title>
+</head>
+<body>
+    <h1>Update Registration Details</h1>
+
+    {% if message %}
+        <p role="status">{{ message }}</p>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('registration.update_details') }}">
+        <div>
+            <label for="full_name">Full Name:</label>
+            <input
+                type="text"
+                id="full_name"
+                name="full_name"
+                maxlength="150"
+                value="{{ voter.full_name }}"
+                required
+            >
+        </div>
+
+        <div>
+            <label for="address">Address:</label>
+            <input
+                type="text"
+                id="address"
+                name="address"
+                maxlength="255"
+                value="{{ voter.address }}"
+                required
+            >
+        </div>
+
+        <button type="submit">Save Changes</button>
+    </form>
+
+    <p>
+        <a href="{{ url_for('audit.registration_history') }}">
+            View Registration Change History
+        </a>
+    </p>
+
+    <p>
+        <a href="{{ url_for('auth.home') }}">Return to Home Page</a>
+    </p>
+    <script src="{{ url_for('static', filename='js/session_timeout.js') }}"></script>
+</body>
+</html>

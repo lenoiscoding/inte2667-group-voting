@@ -1,12 +1,14 @@
+
 from datetime import date, datetime
 from io import BytesIO
 import base64
 import pyotp
 import qrcode
-from flask import Blueprint, jsonify, render_template, request
+import time
+from flask import (Blueprint,jsonify,render_template,request,session,redirect,url_for,)
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash
-
+from app.audit.models import RegistrationChange
 from app import db
 from app.auth.models.user import User
 from app.registration.models import VoterRecord
@@ -121,3 +123,94 @@ def register():
         success=True,
         qr_code=qr_code
     ), 201
+
+
+@registration_bp.route("/update-details", methods=["GET", "POST"])
+def update_details():
+    user_id = session.get("authenticated_user_id")
+    last_activity = session.get("last_activity", 0)
+
+    # Require an authenticated session.
+    if not user_id:
+        session.clear()
+        return redirect(url_for("auth.login"))
+
+    # Enforce the existing inactivity timeout.
+    if time.time() - last_activity >= 10:
+        session.clear()
+        return redirect(url_for("auth.login"))
+
+    voter = VoterRecord.query.filter_by(user_id=user_id).first()
+
+    if voter is None:
+        return "Voter registration record not found.", 404
+
+    if request.method == "GET":
+        return render_template(
+            "update_registration.html",
+            voter=voter,
+            message="",
+        )
+
+    full_name = (request.form.get("full_name") or "").strip()
+    address = (request.form.get("address") or "").strip()
+
+    if not full_name or not address:
+        return render_template(
+            "update_registration.html",
+            voter=voter,
+            message="Name and address are required.",
+        ), 400
+
+    if len(full_name) > 150 or len(address) > 255:
+        return render_template(
+            "update_registration.html",
+            voter=voter,
+            message="Name or address exceeds the permitted length.",
+        ), 400
+
+    changes = []
+
+    if full_name != voter.full_name:
+        changes.append(
+            RegistrationChange(
+                user_id=user_id,
+                field_name="full_name",
+                old_value=voter.full_name,
+                new_value=full_name,
+            )
+        )
+
+    if address != voter.address:
+        changes.append(
+            RegistrationChange(
+                user_id=user_id,
+                field_name="address",
+                old_value=voter.address,
+                new_value=address,
+            )
+        )
+
+    try:
+        if full_name != voter.full_name:
+            voter.full_name = full_name
+
+        if address != voter.address:
+            voter.address = address
+
+        db.session.add_all(changes)
+        db.session.commit()
+
+    except Exception:
+        db.session.rollback()
+        raise
+
+    return render_template(
+        "update_registration.html",
+        voter=voter,
+        message=(
+            "Registration details updated successfully."
+            if changes
+            else "No changes were made to your registration details."
+        ),
+    )
