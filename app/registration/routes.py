@@ -1,4 +1,4 @@
-
+from app.email_service import send_registration_change_email
 from datetime import date, datetime
 from io import BytesIO
 import base64
@@ -48,6 +48,7 @@ def register():
         return render_template("register.html", message="", success=False, qr_code=None)
 
     username = (request.form.get("username") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
     password = request.form.get("password") or ""
     full_name = (request.form.get("full_name") or "").strip()
     address = (request.form.get("address") or "").strip()
@@ -61,9 +62,25 @@ def register():
             "register.html", message=message, success=False, qr_code=None
         ), status
 
-    if not all([username, password, full_name, address, id_document_number, dob_raw]):
+    if not all([
+        username,
+        email,
+        password,
+        full_name,
+        address,
+        id_document_number,
+        dob_raw,
+    ]):
         return fail("All fields are required.")
 
+    if (
+        len(email) > 254
+        or email.count("@") != 1
+        or email.startswith("@")
+        or email.endswith("@")
+        or "." not in email.rsplit("@", 1)[1]
+    ):
+        return fail("Please enter a valid email address.")
     if len(password) < MIN_PASSWORD_LENGTH:
         return fail(
             f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
@@ -80,6 +97,7 @@ def register():
     # Duplicate registration check
     already_registered = (
         User.query.filter_by(username=username).first()
+        or User.query.filter_by(email=email).first()
         or VoterRecord.query.filter_by(
             id_document_number=id_document_number
         ).first()
@@ -92,6 +110,7 @@ def register():
     try:
         user = User(
             username=username,
+            email=email,
             password_hash=generate_password_hash(password),
             role="voter",
             totp_secret=secret
@@ -190,6 +209,9 @@ def update_details():
                 new_value=address,
             )
         )
+    changed_fields = [
+        change.field_name for change in changes
+    ]
 
     try:
         if full_name != voter.full_name:
@@ -205,11 +227,42 @@ def update_details():
         db.session.rollback()
         raise
 
+    notification_message = ""
+
+    if changes:
+        user = db.session.get(User, user_id)
+
+        if user and user.email:
+            try:
+                send_registration_change_email(
+                    user.email,
+                    changed_fields
+                )
+                notification_message = (
+                    " An email notification was sent."
+                )
+            except Exception:
+                # The database changes are already committed.
+                # Do not undo them if email delivery fails.
+                notification_message = (
+                    " However, the email notification could not "
+                    "be sent. Please contact the system "
+                    "administrator."
+                )
+        else:
+            notification_message = (
+                " No email notification was sent because "
+                "your account has no email address."
+            )
+
     return render_template(
         "update_registration.html",
         voter=voter,
         message=(
-            "Registration details updated successfully."
+            (
+                "Registration details updated successfully."
+                + notification_message
+            )
             if changes
             else "No changes were made to your registration details."
         ),

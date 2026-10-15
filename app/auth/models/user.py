@@ -55,3 +55,8 @@ class User(db.Model):
         db.String(32), 
         nullable=True
     )
+    email = db.Column(
+        db.String(254),
+        unique=True,
+        nullable=True
+    )
