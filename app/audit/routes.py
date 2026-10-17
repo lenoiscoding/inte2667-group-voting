@@ -26,19 +26,16 @@ def registration_history():
         session.clear()
         return redirect(url_for("auth.login"))
 
-    # Apply the existing inactivity timeout.
-    if time.time() - last_activity >= 10:
+
+    if time.time() - last_activity >= 60:
         session.clear()
         return redirect(url_for("auth.login"))
 
-    # Find the registration record belonging to the signed-in voter.
     voter = VoterRecord.query.filter_by(user_id=user_id).first()
 
     if voter is None:
         return "Voter registration record not found.", 404
 
-    # Retrieve only this voter's registration change history,
-    # with the most recent change displayed first.
     changes = (
         RegistrationChange.query
         .filter_by(user_id=user_id)

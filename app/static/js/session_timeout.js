@@ -6,7 +6,7 @@ function resetTimer() {
 
   timeout = setTimeout(() => {
     window.location.href = "/auth/login";
-  }, 10000);
+  }, 60000);
 }
 
 function recordActivity() {

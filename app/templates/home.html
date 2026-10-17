@@ -1,34 +1,45 @@
-
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Home Page</title>
+
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/home.css') }}"
+    />
   </head>
+
   <body>
-    <h1>Home Page</h1>
+    <div class="login-container">
+      <div class="login-box home-box">
+        <h1>Election System</h1>
+        <p class="subtitle">Home Page</p>
 
-    <section>
-      <h2>Login Security</h2>
-      {% if previous_successful_login %}
-        <p>
-          Your previous successful login was:
-          <time>{{ previous_successful_login }}</time>
-        </p>
-      {% else %}
-        <p>No previous successful login has been recorded.</p>
-      {% endif %}
-    </section>
+        <section class="home-section">
+          <h2>Login Security</h2>
 
-    <section>
-      <h2>Registration Security</h2>
-      <p>
-        <a href="{{ url_for('audit.registration_history') }}">
-          View Registration Change History
-        </a>
-      </p>
-    </section>
+          {% if previous_successful_login %}
+          <p>
+            Your previous successful login was:
+            <time>{{ previous_successful_login }}</time>
+          </p>
+          {% else %}
+          <p>No previous successful login has been recorded.</p>
+          {% endif %}
+        </section>
+
+        <section class="home-section">
+          <h2>Registration Security</h2>
+          <p>
+            <a href="{{ url_for('audit.registration_history') }}">
+              View Registration Change History
+            </a>
+          </p>
+        </section>
+      </div>
+    </div>
 
     <script src="{{ url_for('static', filename='js/session_timeout.js') }}"></script>
   </body>
