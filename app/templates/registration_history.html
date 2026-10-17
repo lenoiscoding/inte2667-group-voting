@@ -1,0 +1,52 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Change History</title>
+</head>
+<body>
+    <h1>Registration Change History</h1>
+
+    <p>
+        This page shows the recorded changes to your voter registration details.
+        The history is read-only.
+    </p>
+
+    <p>
+        <strong>Voter reference:</strong> {{ voter.voter_ref }}
+    </p>
+
+    {% if changes %}
+        <table border="1" cellpadding="8" cellspacing="0">
+            <thead>
+                <tr>
+                    <th>Field Changed</th>
+                    <th>Previous Value</th>
+                    <th>New Value</th>
+                    <th>Date and Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for change in changes %}
+                    <tr>
+                        <td>{{ change.field_name }}</td>
+                        <td>{{ change.old_value }}</td>
+                        <td>{{ change.new_value }}</td>
+                        <td>
+                            <time>{{ change.changed_at }}</time>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No registration changes have been recorded yet.</p>
+    {% endif %}
+
+    <p>
+        <a href="{{ url_for('auth.home') }}">Return to Home Page</a>
+    </p>
+</body>
+</html>
