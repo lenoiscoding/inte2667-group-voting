@@ -10,6 +10,12 @@ cp .env.example .env   # fill in real values
 docker-compose up --build
 ```
 
+Then open **https://localhost** (Req 6). nginx (`nginx/`) serves the app over
+TLS 1.2/1.3 with HSTS and redirects `http://` to `https://`; the app's own port
+is not published. The first start creates a self-signed certificate, so the
+browser warns once: accept it for the demo. (If you add that certificate to
+your keychain, browsers will remember HSTS for `localhost` for a year.)
+
 Health check: `GET /health`
 
 ## Structure
@@ -36,7 +42,7 @@ initdb/         -> DB init SQL (schema, Postgres roles/grants) goes here
 - [ ] #4 — Log all login attempts (user ID, timestamp, IP, outcome) — High / Medium
 - [ ] #12 — Show last successful login on sign-in — Low / Low
 - [ ] #14 — Security reminder on login page — Low / Low
-- [ ] #16 — Mask password input, optional show-toggle — Low / Low
+- [x] #16 — Mask password input, optional show-toggle — Low / Low
 
 ### Registration
 - [ ] #5 — Duplicate registration check — High / Medium
@@ -47,8 +53,8 @@ initdb/         -> DB init SQL (schema, Postgres roles/grants) goes here
 - [ ] #22 — Health-check endpoint + auto-restart on failure — Medium / Medium
 
 ### Voting
-- [ ] #6 — Encrypt ballot in transit (TLS) — High / High
-- [ ] #7 — One vote per voter, reject repeat submissions — High / Medium
+- [x] #6 — Encrypt ballot in transit (TLS) — High / High
+- [x] #7 — One vote per voter, reject repeat submissions — High / Medium
 - [ ] #17 — Validate House ballot (sequential 1..N, no gaps/dupes) — Medium / Medium
 - [ ] #18 — Validate Senate ballot (ATL/BTL rules, preference precedence) — High / High
 - [ ] #19 — Checkpointed state machine for vote-count recovery — Medium / High *(Counting-adjacent — confirm scope)*
@@ -76,5 +82,5 @@ initdb/         -> DB init SQL (schema, Postgres roles/grants) goes here
 - [ ] CI (`.github/workflows/ci.yml`) already runs pytest on push — keep it green
 - [ ] Rate limiting (Flask-Limiter) on auth endpoints
 - [ ] CSRF (Flask-WTF) on any form-based routes
-- [ ] TLS for #6 — terminate via reverse proxy or Flask adhoc SSL for the demo
+- [x] TLS for #6 — nginx reverse proxy in `nginx/`
 

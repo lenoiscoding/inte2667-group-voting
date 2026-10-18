@@ -112,3 +112,31 @@ button:hover {
   display: block;
   margin-bottom: 4px;
 }
+
+/* Req 16: Show/Hide button added inside password fields by password_toggle.js */
+.password-field {
+  position: relative;
+  display: block;
+}
+
+.password-field input {
+  padding-right: 72px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+
+  width: auto;
+  padding: 6px 10px;
+
+  background-color: #eee;
+  color: #333;
+  font-size: 13px;
+}
+
+.password-toggle:hover {
+  background-color: #ddd;
+}

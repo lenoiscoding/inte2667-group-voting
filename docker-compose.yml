@@ -1,12 +1,26 @@
 services:
+  # Req 6: the only published ports. nginx terminates TLS and forwards to web.
+  proxy:
+    build: ./nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - certs:/etc/nginx/certs
+    depends_on:
+      - web
+    restart: unless-stopped
+
   web:
     build: .
-    ports:
-      - "5000:5000"
+    # Not published to the host: reachable only through the TLS proxy (Req 6).
+    expose:
+      - "5000"
     environment:
       SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in .env}"
       JWT_SECRET_KEY: "${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}"
       DATABASE_URL: "postgresql+psycopg2://evoting:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/evoting"
+      BEHIND_TLS_PROXY: "1"
     depends_on:
       db:
         condition: service_healthy
@@ -36,3 +50,4 @@ services:
 
 volumes:
   pgdata:
+  certs:

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cast Your Vote</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/login.css') }}"
+    />
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="login-box">
+        <h1>Election System</h1>
+
+        {% if state == "open" %}
+        <p class="subtitle">House of Representatives</p>
+        {% if message %}
+        <p class="security-reminder" role="alert">{{ message }}</p>
+        {% endif %}
+        <p>
+          Number every box from 1 to {{ candidates | length }} in your order
+          of preference.
+        </p>
+
+        <form method="POST" action="{{ url_for('voting.cast_ballot') }}">
+          <input type="hidden" name="ballot_token" value="{{ token }}" />
+          {% for name in candidates %}
+          <div class="input-group">
+            <label for="pref_{{ loop.index0 }}">{{ name }}</label>
+            <input
+              type="number"
+              id="pref_{{ loop.index0 }}"
+              name="pref_{{ loop.index0 }}"
+              min="1"
+              max="{{ candidates | length }}"
+              required
+            />
+          </div>
+          {% endfor %}
+          <button type="submit">Cast vote</button>
+        </form>
+
+        {% elif state == "cast" %}
+        <p class="subtitle">Your vote has been recorded.</p>
+        <p>
+          Your ballot was stored without your name or voter ID. It cannot be
+          changed or cast again.
+        </p>
+
+        {% elif state == "used" %}
+        <p class="subtitle">This ballot has already been used or has expired.</p>
+        <p class="register-link">
+          <a href="{{ url_for('voting.ballot') }}">Open my ballot again</a>
+        </p>
+
+        {% else %}
+        <p class="subtitle">You have already voted in this election.</p>
+        {% endif %}
+
+        <p class="register-link">
+          <a href="{{ url_for('auth.home') }}">Return to Home Page</a>
+        </p>
+      </div>
+    </div>
+
+    {% if state == "open" %}
+    <script src="{{ url_for('static', filename='js/session_timeout.js') }}"></script>
+    {% endif %}
+  </body>
+</html>

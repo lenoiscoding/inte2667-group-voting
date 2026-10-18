@@ -2,6 +2,7 @@ import os
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 db = SQLAlchemy()
 jwt = JWTManager()
@@ -31,6 +32,15 @@ def create_app():
         "dev"
     )
 
+    # Req 6: in Docker the app is reachable only through the nginx TLS proxy.
+    # Trust that one proxy's headers so request.is_secure and the client IP are
+    # correct, never send the session cookie over plain HTTP, and let the
+    # voting blueprint refuse anything that did not arrive over HTTPS.
+    if os.environ.get("BEHIND_TLS_PROXY") == "1":
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+        app.config["SESSION_COOKIE_SECURE"] = True
+        app.config["REQUIRE_HTTPS"] = True
+
     # Initialise extensions
     db.init_app(app)
     jwt.init_app(app)
@@ -39,6 +49,7 @@ def create_app():
     from app.auth.models.user import User
     from app.auth.models.login_attempt import LoginAttempt
     from app.audit.models import RegistrationChange
+    from app.voting.models import Ballot, BallotToken, VoterParticipation
 
     # Import routes
     from app.auth.routes import auth_bp
@@ -55,7 +66,7 @@ def create_app():
     )
     app.register_blueprint(
         voting_bp,
-        url_prefix="/api/voting"
+        url_prefix="/voting"
     )
     app.register_blueprint(
         audit_bp,
