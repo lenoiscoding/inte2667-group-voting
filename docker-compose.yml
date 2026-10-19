@@ -21,6 +21,8 @@ services:
       JWT_SECRET_KEY: "${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}"
       DATABASE_URL: "postgresql+psycopg2://evoting:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/evoting"
       BEHIND_TLS_PROXY: "1"
+      # Req 8/11: AES-256 key (64 hex chars). Blank = built-in test key.
+      AES_KEY: "${AES_KEY:-}"
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +49,22 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  # Req 11: encrypted point-in-time snapshot of the database.
+  #   docker compose run --rm backup   ->   backups/<time>.db.enc + .sha256
+  backup:
+    build:
+      context: .
+      dockerfile: app/storage/backup.Dockerfile
+    profiles: ["tools"]
+    environment:
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+      AES_KEY: "${AES_KEY:-}"
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

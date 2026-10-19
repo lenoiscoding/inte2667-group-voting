@@ -6,6 +6,7 @@ from werkzeug.security import check_password_hash
 from app import db
 from app.auth.models.user import User
 from app.auth.models.login_attempt import LoginAttempt
+from app.storage.integration import record_event
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -35,6 +36,7 @@ def login():
                     outcome="success"
                 ))
                 db.session.commit()
+                record_event("LOGIN_SUCCESS", user.user_id, ip=request.remote_addr)
 
                 session.clear()
                 session["authenticated_user_id"] = user.user_id
@@ -55,6 +57,8 @@ def login():
                         failure_reason="invalid authenticator code"
                     ))
                     db.session.commit()
+                    record_event("LOGIN_FAILED", user.user_id, ip=request.remote_addr,
+                                 reason="invalid authenticator code")
 
                 message = "Invalid authenticator code. Try again."
                 show_otp = True
@@ -90,6 +94,11 @@ def login():
                         message = "Account locked for 5 seconds."
 
                     db.session.commit()
+                    record_event("LOGIN_FAILED", user.user_id, ip=request.remote_addr,
+                                 reason="incorrect password")
+                else:
+                    record_event("LOGIN_FAILED", "unknown", ip=request.remote_addr,
+                                 reason="unknown username")
 
             elif not user.is_active:
                 message = "Account is inactive."

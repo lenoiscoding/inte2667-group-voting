@@ -349,28 +349,24 @@ def count_ballots(conn: sqlite3.Connection) -> int:
 # Req 11 - encrypted backups + checksum
 # ===========================================================================
 
+def _snapshot_key(hex_key: str | None) -> bytes:
+    """Same key as Req 8: the one passed in, else AES_KEY, else the test key."""
+    return bytes.fromhex(hex_key) if hex_key else PIIEncryption._load_key()
+
+
 def create_encrypted_snapshot(db_path: str, backup_dir: str,
                               hex_key: str | None = None) -> dict:
     """
-    Backs up the database, encrypts it and writes a checksum file next to it.
+    Backs up a SQLite database, encrypts it and writes a checksum file next to it.
 
     How it works:
       - copy the db to a temp file using sqlite's backup() (this works even
         while the db is being used, unlike just copying the file)
-      - encrypt the copy with AES-256-GCM
-      - save it as <timestamp>.db.enc
-      - save the SHA-256 of the encrypted file in <timestamp>.db.enc.sha256
+      - encrypt it and write the checksum (write_encrypted_snapshot below)
       - delete the temp copy so there's no unencrypted backup lying around
 
     Returns a dict with snapshot_file, checksum_file, sha256 and timestamp.
     """
-    os.makedirs(backup_dir, exist_ok=True)
-    timestamp = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    snapshot_name = f"{timestamp}.db.enc"
-    checksum_name = f"{timestamp}.db.enc.sha256"
-    snapshot_path = os.path.join(backup_dir, snapshot_name)
-    checksum_path = os.path.join(backup_dir, checksum_name)
-
     # copy the live db to a temp file
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
     os.close(tmp_fd)
@@ -386,10 +382,28 @@ def create_encrypted_snapshot(db_path: str, backup_dir: str,
     finally:
         os.remove(tmp_path)  # don't leave the unencrypted copy behind
 
-    # encrypt it (same test key as Req 8 if no key is given)
-    raw_key = bytes.fromhex(hex_key) if hex_key else \
-        hashlib.sha256(b"prototype-aes-key-do-not-use-in-production").digest()
-    aesgcm = AESGCM(raw_key)
+    return write_encrypted_snapshot(raw_bytes, backup_dir, hex_key)
+
+
+def write_encrypted_snapshot(raw_bytes: bytes, backup_dir: str,
+                             hex_key: str | None = None) -> dict:
+    """
+    Encrypts a database copy with AES-256-GCM and writes a checksum file next to it.
+    Used for SQLite (above) and for the app's PostgreSQL dump (backup.py).
+
+      - save it as <timestamp>.db.enc
+      - save the SHA-256 of the encrypted file in <timestamp>.db.enc.sha256
+
+    Returns a dict with snapshot_file, checksum_file, sha256 and timestamp.
+    """
+    os.makedirs(backup_dir, exist_ok=True)
+    timestamp = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    snapshot_name = f"{timestamp}.db.enc"
+    checksum_name = f"{timestamp}.db.enc.sha256"
+    snapshot_path = os.path.join(backup_dir, snapshot_name)
+    checksum_path = os.path.join(backup_dir, checksum_name)
+
+    aesgcm = AESGCM(_snapshot_key(hex_key))
     nonce = os.urandom(12)
     encrypted_blob = nonce + aesgcm.encrypt(nonce, raw_bytes, None)
 
@@ -433,13 +447,11 @@ def verify_snapshot_checksum(snapshot_path: str, checksum_path: str) -> tuple[bo
 def restore_snapshot(snapshot_path: str, restore_path: str,
                      hex_key: str | None = None) -> None:
     """
-    Decrypts a backup back into a normal SQLite file.
+    Decrypts a backup back into the original file (SQLite db or SQL dump).
     If the file was changed at all, GCM's tag check fails and it raises an
     error instead of writing out a broken db.
     """
-    raw_key = bytes.fromhex(hex_key) if hex_key else \
-        hashlib.sha256(b"prototype-aes-key-do-not-use-in-production").digest()
-    aesgcm = AESGCM(raw_key)
+    aesgcm = AESGCM(_snapshot_key(hex_key))
 
     with open(snapshot_path, "rb") as f:
         encrypted_blob = f.read()

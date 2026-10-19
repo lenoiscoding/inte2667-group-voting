@@ -12,6 +12,7 @@ from app.audit.models import RegistrationChange
 from app import db
 from app.auth.models.user import User
 from app.registration.models import VoterRecord
+from app.storage.integration import record_event
 
 registration_bp = Blueprint("registration", __name__)
 
@@ -133,6 +134,8 @@ def register():
         db.session.rollback()
         return fail("These details are already registered.", 409)
 
+    record_event("VOTER_REGISTERED", user.user_id, ip=request.remote_addr)
+
     return render_template(
         "register.html",
         message=(
@@ -230,6 +233,8 @@ def update_details():
     notification_message = ""
 
     if changes:
+        # Only the field names are logged, never the personal details.
+        record_event("DETAILS_CHANGED", user_id, fields=changed_fields)
         user = db.session.get(User, user_id)
 
         if user and user.email:

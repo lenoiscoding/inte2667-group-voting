@@ -2,6 +2,7 @@ import secrets
 from datetime import datetime, timezone
 
 from app import db
+from app.storage.integration import EncryptedDate, EncryptedText
 
 
 def generate_voter_ref():
@@ -29,9 +30,10 @@ class VoterRecord(db.Model):
         nullable=False
     )
 
-    full_name = db.Column(db.String(150), nullable=False)
-    date_of_birth = db.Column(db.Date, nullable=False)
-    address = db.Column(db.String(255), nullable=False)
+    # Req 8: personal details are stored AES-256-GCM encrypted.
+    full_name = db.Column(EncryptedText, nullable=False)
+    date_of_birth = db.Column(EncryptedDate, nullable=False)
+    address = db.Column(EncryptedText, nullable=False)
 
     # Identity document number (e.g. driver licence / passport), supplied by
     # the voter and used for the duplicate registration check

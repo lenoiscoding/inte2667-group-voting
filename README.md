@@ -60,12 +60,21 @@ initdb/         -> DB init SQL (schema, Postgres roles/grants) goes here
 - [ ] #19 — Checkpointed state machine for vote-count recovery — Medium / High *(Counting-adjacent — confirm scope)*
 
 ### Storage
-- [ ] #8 — Encrypt elector PII at rest (AES-256) — High / High
-- [ ] #9 — Tamper-evident audit log via hash chaining — High / High
-- [ ] #10 — Ballots stored decoupled from elector identity (no FK/IP/timestamp linking voter to ballot) — High / High
-- [ ] #11 — Encrypted point-in-time DB snapshots with SHA-256 checksum — High / High
+- [x] #8 — Encrypt elector PII at rest (AES-256) — High / High
+- [x] #9 — Tamper-evident audit log via hash chaining — High / High
+- [x] #10 — Ballots stored decoupled from elector identity (no FK/IP/timestamp linking voter to ballot) — High / High
+- [x] #11 — Encrypted point-in-time DB snapshots with SHA-256 checksum — High / High
 
 **Complexity tally:** High 8 · Medium 10 · Low 6 (meets the ≥8 High / ≥8 Medium rule)
+
+### Storage in the app (Req 8–11)
+`app/storage/storage.py` is connected to the app by `app/storage/integration.py`:
+- **#8** — voter name, address and date of birth, and the change history, are stored AES-256-GCM encrypted (`AES_KEY` in `.env`).
+- **#9** — logins, registrations and detail changes go into the hash-chained `audit_log`; the database refuses UPDATE/DELETE on it. Check the chain: `docker compose exec web flask --app run verify-audit`
+- **#10** — ballots are stored by the voting module with no link to the voter. Votes are not written to the audit log.
+- **#11** — `docker compose run --rm backup` writes an encrypted `pg_dump` and its `.sha256` to `backups/`.
+
+The voter columns changed type, so reset an existing database once: `docker compose down -v` (or delete `instance/dev.db` locally).
 
 ## Security utilities (`app/security/`)
 - [ ] `hashing.py` — password hashing helpers (bcrypt)

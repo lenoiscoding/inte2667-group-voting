@@ -50,6 +50,7 @@ def create_app():
     from app.auth.models.login_attempt import LoginAttempt
     from app.audit.models import RegistrationChange
     from app.voting.models import Ballot, BallotToken, VoterParticipation
+    from app.storage.integration import AuditLog, verify_audit_command
 
     # Import routes
     from app.auth.routes import auth_bp
@@ -76,6 +77,9 @@ def create_app():
         reports_bp,
         url_prefix="/api/reports"
     )
+
+    # Req 9: flask --app run verify-audit
+    app.cli.add_command(verify_audit_command)
 
     # Create database tables
     with app.app_context():
