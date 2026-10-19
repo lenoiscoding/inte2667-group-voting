@@ -23,6 +23,12 @@ services:
       BEHIND_TLS_PROXY: "1"
       # Req 8/11: AES-256 key (64 hex chars). Blank = built-in test key.
       AES_KEY: "${AES_KEY:-}"
+      # Req 13: optional email settings (blank = no email).
+      MAIL_SERVER: "${MAIL_SERVER:-}"
+      MAIL_PORT: "${MAIL_PORT:-587}"
+      MAIL_USERNAME: "${MAIL_USERNAME:-}"
+      MAIL_PASSWORD: "${MAIL_PASSWORD:-}"
+      MAIL_DEFAULT_SENDER: "${MAIL_DEFAULT_SENDER:-}"
     depends_on:
       db:
         condition: service_healthy
