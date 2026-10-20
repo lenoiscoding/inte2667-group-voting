@@ -1,3 +1,4 @@
+
 * {
   box-sizing: border-box;
 }
@@ -6,11 +7,9 @@ body {
   margin: 0;
   font-family: Arial, sans-serif;
   background-color: #f2f4f7;
-
   display: flex;
   justify-content: center;
   align-items: center;
-
   min-height: 100vh;
 }
 
@@ -24,7 +23,6 @@ body {
   background-color: white;
   padding: 40px;
   border-radius: 10px;
-
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
@@ -52,10 +50,8 @@ label {
 input {
   width: 100%;
   padding: 12px;
-
   border: 1px solid #ccc;
   border-radius: 5px;
-
   font-size: 16px;
 }
 
@@ -67,13 +63,10 @@ input:focus {
 button {
   width: 100%;
   padding: 12px;
-
   border: none;
   border-radius: 5px;
-
   background-color: #333;
   color: white;
-
   font-size: 16px;
   cursor: pointer;
 }
@@ -111,4 +104,30 @@ button:hover {
 .security-reminder strong {
   display: block;
   margin-bottom: 4px;
+}
+
+/* Req 16: Show/Hide button added by password_toggle.js */
+.password-field {
+  position: relative;
+  display: block;
+}
+
+.password-field input {
+  padding-right: 72px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: auto;
+  padding: 6px 10px;
+  background-color: #eee;
+  color: #333;
+  font-size: 13px;
+}
+
+.password-toggle:hover {
+  background-color: #ddd;
 }

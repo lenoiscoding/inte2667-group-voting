@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
   <head>
@@ -13,11 +14,16 @@
       src="{{ url_for('static', filename='js/login.js') }}"
       defer
     ></script>
+    <script
+      src="{{ url_for('static', filename='js/password_toggle.js') }}"
+      defer
+    ></script>
   </head>
+
   <body>
     <div class="login-container">
       <div class="login-box">
-              <h1>Election System</h1>
+        <h1>Election System</h1>
 
         <div class="security-reminder" role="note">
           <strong>Security reminder:</strong>
@@ -78,9 +84,10 @@
 
           <button type="submit">Login</button>
         </form>
+
         <p class="register-link">
           New user?
-          <a href="/registration/register">Register an account</a>
+          <a href="{{ url_for('registration.register') }}">Register an account</a>
         </p>
         {% endif %}
       </div>

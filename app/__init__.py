@@ -1,7 +1,9 @@
+
 import os
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 db = SQLAlchemy()
 jwt = JWTManager()
@@ -22,14 +24,14 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     # Security configuration
-    app.config["SECRET_KEY"] = os.environ.get(
-        "SECRET_KEY",
-        "dev"
-    )
-    app.config["JWT_SECRET_KEY"] = os.environ.get(
-        "JWT_SECRET_KEY",
-        "dev"
-    )
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev")
+    app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev")
+
+    # Req 6: Trust the nginx TLS proxy when running behind it.
+    if os.environ.get("BEHIND_TLS_PROXY") == "1":
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+        app.config["SESSION_COOKIE_SECURE"] = True
+        app.config["REQUIRE_HTTPS"] = True
 
     # Initialise extensions
     db.init_app(app)
@@ -39,6 +41,8 @@ def create_app():
     from app.auth.models.user import User
     from app.auth.models.login_attempt import LoginAttempt
     from app.audit.models import RegistrationChange
+    from app.voting.models import Ballot, BallotToken, VoterParticipation
+    from app.storage.integration import AuditLog, verify_audit_command
 
     # Import routes
     from app.auth.routes import auth_bp
@@ -55,7 +59,7 @@ def create_app():
     )
     app.register_blueprint(
         voting_bp,
-        url_prefix="/api/voting"
+         url_prefix="/voting"
     )
     app.register_blueprint(
         audit_bp,
@@ -65,6 +69,9 @@ def create_app():
         reports_bp,
         url_prefix="/api/reports"
     )
+
+    # Req 9: Verify the audit log through the Flask CLI.
+    app.cli.add_command(verify_audit_command)
 
     # Create database tables
     with app.app_context():

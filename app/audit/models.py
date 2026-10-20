@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 
 from app import db
+from app.storage.integration import EncryptedText
 
 
 class RegistrationChange(db.Model):
@@ -19,8 +20,10 @@ class RegistrationChange(db.Model):
     )
 
     field_name = db.Column(db.String(50), nullable=False)
-    old_value = db.Column(db.String(255), nullable=False)
-    new_value = db.Column(db.String(255), nullable=False)
+
+    # Req 8: encrypt personal details stored in the change history.
+    old_value = db.Column(EncryptedText, nullable=False)
+    new_value = db.Column(EncryptedText, nullable=False)
 
     changed_at = db.Column(
         db.DateTime(timezone=True),

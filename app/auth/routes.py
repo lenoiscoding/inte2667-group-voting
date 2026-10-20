@@ -1,20 +1,33 @@
+
 from datetime import datetime, timezone, timedelta
 import pyotp
 import time
-from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify
+
+from flask import (
+    Blueprint,
+    render_template,
+    request,
+    session,
+    redirect,
+    url_for,
+    jsonify,
+)
 from werkzeug.security import check_password_hash
+
 from app import db
 from app.auth.models.user import User
 from app.auth.models.login_attempt import LoginAttempt
+from app.storage.integration import record_event
+
 
 auth_bp = Blueprint("auth", __name__)
+
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     message = ""
     show_otp = "pending_mfa_user_id" in session
     now = datetime.now(timezone.utc)
-
 
     if request.method == "POST":
         if "otp" in request.form:
@@ -24,17 +37,26 @@ def login():
             if user and user.totp_secret and pyotp.TOTP(
                 user.totp_secret
             ).verify(request.form.get("otp", ""), valid_window=1):
+                # R12: Save the previous successful login before updating it.
                 previous_login = user.last_successful_login
                 user.last_successful_login = now
                 db.session.flush()
 
-                db.session.add(LoginAttempt(
-                    user_id=user.user_id,
-                    timestamp=now,
-                    source_ip=request.remote_addr,
-                    outcome="success"
-                ))
+                db.session.add(
+                    LoginAttempt(
+                        user_id=user.user_id,
+                        timestamp=now,
+                        source_ip=request.remote_addr,
+                        outcome="success",
+                    )
+                )
                 db.session.commit()
+
+                record_event(
+                    "LOGIN_SUCCESS",
+                    user.user_id,
+                    ip=request.remote_addr,
+                )
 
                 session.clear()
                 session["authenticated_user_id"] = user.user_id
@@ -47,14 +69,23 @@ def login():
 
             else:
                 if user:
-                    db.session.add(LoginAttempt(
-                        user_id=user.user_id,
-                        timestamp=now,
-                        source_ip=request.remote_addr,
-                        outcome="denied",
-                        failure_reason="invalid authenticator code"
-                    ))
+                    db.session.add(
+                        LoginAttempt(
+                            user_id=user.user_id,
+                            timestamp=now,
+                            source_ip=request.remote_addr,
+                            outcome="denied",
+                            failure_reason="invalid authenticator code",
+                        )
+                    )
                     db.session.commit()
+
+                    record_event(
+                        "LOGIN_FAILED",
+                        user.user_id,
+                        ip=request.remote_addr,
+                        reason="invalid authenticator code",
+                    )
 
                 message = "Invalid authenticator code. Try again."
                 show_otp = True
@@ -70,19 +101,21 @@ def login():
                 message = "Invalid username or password."
 
                 if user:
-                    db.session.add(LoginAttempt(
-                        user_id=user.user_id,
-                        timestamp=now,
-                        source_ip=request.remote_addr,
-                        outcome="denied",
-                        failure_reason="incorrect password"
-                    ))
+                    db.session.add(
+                        LoginAttempt(
+                            user_id=user.user_id,
+                            timestamp=now,
+                            source_ip=request.remote_addr,
+                            outcome="denied",
+                            failure_reason="incorrect password",
+                        )
+                    )
                     db.session.flush()
 
                     attempts = LoginAttempt.query.filter(
                         LoginAttempt.user_id == user.user_id,
                         LoginAttempt.failure_reason == "incorrect password",
-                        LoginAttempt.timestamp >= now - timedelta(minutes=1)
+                        LoginAttempt.timestamp >= now - timedelta(minutes=1),
                     ).count()
 
                     if attempts >= 3:
@@ -90,6 +123,20 @@ def login():
                         message = "Account locked for 5 seconds."
 
                     db.session.commit()
+
+                    record_event(
+                        "LOGIN_FAILED",
+                        user.user_id,
+                        ip=request.remote_addr,
+                        reason="incorrect password",
+                    )
+                else:
+                    record_event(
+                        "LOGIN_FAILED",
+                        "unknown",
+                        ip=request.remote_addr,
+                        reason="unknown username",
+                    )
 
             elif not user.is_active:
                 message = "Account is inactive."
@@ -107,11 +154,8 @@ def login():
     return render_template(
         "login.html",
         message=message,
-        show_otp=show_otp
+        show_otp=show_otp,
     )
-
-
-
 
 
 @auth_bp.route("/home")
@@ -119,7 +163,7 @@ def home():
     user_id = session.get("authenticated_user_id")
     last_activity = session.get("last_activity", 0)
 
-    if not user_id or time.time() - last_activity >= 10:
+    if not user_id or time.time() - last_activity >= 60:
         session.clear()
         return redirect(url_for("auth.login"))
 
@@ -136,10 +180,9 @@ def update_activity():
     user_id = session.get("authenticated_user_id")
     last_activity = session.get("last_activity", 0)
 
-    if not user_id or time.time() - last_activity >= 10:
+    if not user_id or time.time() - last_activity >= 60:
         session.clear()
         return jsonify({"expired": True}), 401
 
     session["last_activity"] = time.time()
     return jsonify({"ok": True})
-
