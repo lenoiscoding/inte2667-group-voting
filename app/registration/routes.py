@@ -1,3 +1,4 @@
+
 from app.email_service import send_registration_change_email
 from datetime import date, datetime
 from io import BytesIO
@@ -5,14 +6,25 @@ import base64
 import pyotp
 import qrcode
 import time
-from flask import (Blueprint,jsonify,render_template,request,session,redirect,url_for,)
+
+from flask import (
+    Blueprint,
+    jsonify,
+    render_template,
+    request,
+    session,
+    redirect,
+    url_for,
+)
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash
+
 from app.audit.models import RegistrationChange
 from app import db
 from app.auth.models.user import User
 from app.registration.models import VoterRecord
 from app.storage.integration import record_event
+
 
 registration_bp = Blueprint("registration", __name__)
 
@@ -26,10 +38,11 @@ def _age(dob):
         (today.month, today.day) < (dob.month, dob.day)
     )
 
+
 def _generate_qr(secret, username):
     uri = pyotp.TOTP(secret).provisioning_uri(
         name=username,
-        issuer_name="Election System"
+        issuer_name="Election System",
     )
 
     buffer = BytesIO()
@@ -46,7 +59,12 @@ def ping():
 @registration_bp.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
-        return render_template("register.html", message="", success=False, qr_code=None)
+        return render_template(
+            "register.html",
+            message="",
+            success=False,
+            qr_code=None,
+        )
 
     username = (request.form.get("username") or "").strip()
     email = (request.form.get("email") or "").strip().lower()
@@ -60,7 +78,10 @@ def register():
 
     def fail(message, status=400):
         return render_template(
-            "register.html", message=message, success=False, qr_code=None
+            "register.html",
+            message=message,
+            success=False,
+            qr_code=None,
         ), status
 
     if not all([
@@ -82,6 +103,7 @@ def register():
         or "." not in email.rsplit("@", 1)[1]
     ):
         return fail("Please enter a valid email address.")
+
     if len(password) < MIN_PASSWORD_LENGTH:
         return fail(
             f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
@@ -95,7 +117,7 @@ def register():
     if _age(dob) < MIN_AGE:
         return fail(f"You must be at least {MIN_AGE} to register.")
 
-    # Duplicate registration check
+    # Duplicate registration check.
     already_registered = (
         User.query.filter_by(username=username).first()
         or User.query.filter_by(email=email).first()
@@ -103,6 +125,7 @@ def register():
             id_document_number=id_document_number
         ).first()
     )
+
     if already_registered:
         return fail("These details are already registered.", 409)
 
@@ -114,7 +137,7 @@ def register():
             email=email,
             password_hash=generate_password_hash(password),
             role="voter",
-            totp_secret=secret
+            totp_secret=secret,
         )
         db.session.add(user)
         db.session.flush()
@@ -124,17 +147,23 @@ def register():
             full_name=full_name,
             date_of_birth=dob,
             address=address,
-            id_document_number=id_document_number
+            id_document_number=id_document_number,
         )
         db.session.add(voter)
         db.session.commit()
+
         voter_ref = voter.voter_ref
         qr_code = _generate_qr(secret, username)
+
     except IntegrityError:
         db.session.rollback()
         return fail("These details are already registered.", 409)
 
-    record_event("VOTER_REGISTERED", user.user_id, ip=request.remote_addr)
+    record_event(
+        "VOTER_REGISTERED",
+        user.user_id,
+        ip=request.remote_addr,
+    )
 
     return render_template(
         "register.html",
@@ -143,7 +172,7 @@ def register():
             f"{voter_ref}. Scan the QR code with Google Authenticator."
         ),
         success=True,
-        qr_code=qr_code
+        qr_code=qr_code,
     ), 201
 
 
@@ -157,8 +186,8 @@ def update_details():
         session.clear()
         return redirect(url_for("auth.login"))
 
-    # Enforce the existing inactivity timeout.
-    if time.time() - last_activity >= 10:
+    # Use the team's 60-second inactivity timeout.
+    if time.time() - last_activity >= 60:
         session.clear()
         return redirect(url_for("auth.login"))
 
@@ -212,9 +241,8 @@ def update_details():
                 new_value=address,
             )
         )
-    changed_fields = [
-        change.field_name for change in changes
-    ]
+
+    changed_fields = [change.field_name for change in changes]
 
     try:
         if full_name != voter.full_name:
@@ -233,26 +261,27 @@ def update_details():
     notification_message = ""
 
     if changes:
-        # Only the field names are logged, never the personal details.
-        record_event("DETAILS_CHANGED", user_id, fields=changed_fields)
+        # Log field names only, never the personal details themselves.
+        record_event(
+            "DETAILS_CHANGED",
+            user_id,
+            fields=changed_fields,
+        )
+
         user = db.session.get(User, user_id)
 
         if user and user.email:
             try:
                 send_registration_change_email(
                     user.email,
-                    changed_fields
+                    changed_fields,
                 )
-                notification_message = (
-                    " An email notification was sent."
-                )
+                notification_message = " An email notification was sent."
             except Exception:
-                # The database changes are already committed.
-                # Do not undo them if email delivery fails.
+                # Keep the committed registration changes if email fails.
                 notification_message = (
                     " However, the email notification could not "
-                    "be sent. Please contact the system "
-                    "administrator."
+                    "be sent. Please contact the system administrator."
                 )
         else:
             notification_message = (
@@ -264,10 +293,8 @@ def update_details():
         "update_registration.html",
         voter=voter,
         message=(
-            (
-                "Registration details updated successfully."
-                + notification_message
-            )
+            "Registration details updated successfully."
+            + notification_message
             if changes
             else "No changes were made to your registration details."
         ),

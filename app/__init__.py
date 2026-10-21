@@ -1,3 +1,4 @@
+
 import os
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -23,19 +24,10 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     # Security configuration
-    app.config["SECRET_KEY"] = os.environ.get(
-        "SECRET_KEY",
-        "dev"
-    )
-    app.config["JWT_SECRET_KEY"] = os.environ.get(
-        "JWT_SECRET_KEY",
-        "dev"
-    )
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev")
+    app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev")
 
-    # Req 6: in Docker the app is reachable only through the nginx TLS proxy.
-    # Trust that one proxy's headers so request.is_secure and the client IP are
-    # correct, never send the session cookie over plain HTTP, and let the
-    # voting blueprint refuse anything that did not arrive over HTTPS.
+    # Req 6: Trust the nginx TLS proxy when running behind it.
     if os.environ.get("BEHIND_TLS_PROXY") == "1":
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
         app.config["SESSION_COOKIE_SECURE"] = True
@@ -67,7 +59,7 @@ def create_app():
     )
     app.register_blueprint(
         voting_bp,
-        url_prefix="/voting"
+         url_prefix="/voting"
     )
     app.register_blueprint(
         audit_bp,
@@ -78,7 +70,7 @@ def create_app():
         url_prefix="/api/reports"
     )
 
-    # Req 9: flask --app run verify-audit
+    # Req 9: Verify the audit log through the Flask CLI.
     app.cli.add_command(verify_audit_command)
 
     # Create database tables

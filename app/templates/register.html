@@ -1,8 +1,9 @@
+
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Election System Registration</title>
 
     <link
@@ -27,7 +28,9 @@
         >
           {{ message }}
         </p>
-        {% endif %} {% if success and qr_code %}
+        {% endif %}
+
+        {% if success and qr_code %}
         <h2>Set Up Google Authenticator</h2>
         <p>Scan this QR code using Google Authenticator.</p>
 
@@ -42,16 +45,38 @@
         <a href="{{ url_for('auth.login') }}">Go to Login</a>
 
         {% else %}
-
-        <form method="POST" action="/registration/register">
+        <form
+          method="POST"
+          action="{{ url_for('registration.register') }}"
+        >
           <label for="full_name">Full name</label>
-          <input type="text" id="full_name" name="full_name" required />
+          <input
+            type="text"
+            id="full_name"
+            name="full_name"
+            maxlength="150"
+            autocomplete="name"
+            required
+          />
 
           <label for="date_of_birth">Date of birth</label>
-          <input type="date" id="date_of_birth" name="date_of_birth" required />
+          <input
+            type="date"
+            id="date_of_birth"
+            name="date_of_birth"
+            required
+          />
 
           <label for="address">Address</label>
-          <input type="text" id="address" name="address" required />
+          <input
+            type="text"
+            id="address"
+            name="address"
+            maxlength="255"
+            autocomplete="street-address"
+            required
+          />
+
           <label for="email">Email address</label>
           <input
             type="email"
@@ -62,6 +87,7 @@
             placeholder="Enter your email address"
             required
           />
+
           <label for="id_document_number">Identity document number</label>
           <input
             type="text"
@@ -72,7 +98,13 @@
           />
 
           <label for="username">Username</label>
-          <input type="text" id="username" name="username" required />
+          <input
+            type="text"
+            id="username"
+            name="username"
+            autocomplete="username"
+            required
+          />
 
           <label for="password">Password</label>
           <input
@@ -80,6 +112,7 @@
             id="password"
             name="password"
             minlength="12"
+            autocomplete="new-password"
             required
           />
 
@@ -87,9 +120,8 @@
         </form>
 
         <p style="text-align: center">
-          <a href="/auth/login">Already registered? Log in</a>
+          <a href="{{ url_for('auth.login') }}">Already registered? Log in</a>
         </p>
-
         {% endif %}
       </div>
     </div>

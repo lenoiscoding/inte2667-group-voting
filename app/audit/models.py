@@ -20,7 +20,8 @@ class RegistrationChange(db.Model):
     )
 
     field_name = db.Column(db.String(50), nullable=False)
-    # Req 8: old and new names/addresses are personal details too.
+
+    # Req 8: encrypt personal details stored in the change history.
     old_value = db.Column(EncryptedText, nullable=False)
     new_value = db.Column(EncryptedText, nullable=False)
 
