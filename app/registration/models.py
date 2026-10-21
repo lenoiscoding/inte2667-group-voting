@@ -50,3 +50,19 @@ class VoterRecord(db.Model):
 
     def __repr__(self):
         return f"<VoterRecord {self.voter_id}>"
+
+
+class ElectoralRollEntry(db.Model):
+    """Req 20: the local copy of the electoral roll that registrations are checked against.
+
+    Loaded with `flask --app run import-roll <csv>`. The name and date of birth
+    are personal details, so they are encrypted like voter records (Req 8).
+    """
+
+    __tablename__ = "electoral_roll"
+
+    roll_id = db.Column(db.Integer, primary_key=True)
+    id_document_number = db.Column(db.String(50), unique=True, nullable=False)
+    full_name = db.Column(EncryptedText, nullable=False)
+    date_of_birth = db.Column(EncryptedDate, nullable=False)
+    is_eligible = db.Column(db.Boolean, nullable=False, default=True)

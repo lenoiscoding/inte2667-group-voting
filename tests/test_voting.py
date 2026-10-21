@@ -10,9 +10,13 @@ from app import db
 from app.auth.models.user import User
 from app.registration.models import VoterRecord
 from app.voting.models import Ballot, BallotToken, VoterParticipation
-from app.voting.routes import ELECTION_ID, HOUSE_CANDIDATES
+from app.voting.routes import ELECTION_ID, HOUSE_CANDIDATES, SENATE_GROUPS
 
-FULL_BALLOT = {f"pref_{i}": str(i + 1) for i in range(len(HOUSE_CANDIDATES))}
+FULL_BALLOT = {
+    **{f"pref_{i}": str(i + 1) for i in range(len(HOUSE_CANDIDATES))},
+    # Req 18: a formal Senate vote, numbered 1 to 6 above the line.
+    **{f"atl_{group['code']}": str(n) for n, group in enumerate(SENATE_GROUPS[:6], start=1)},
+}
 
 
 @pytest.fixture

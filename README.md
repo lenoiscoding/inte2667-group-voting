@@ -26,9 +26,19 @@ You need [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 Stop with `Ctrl+C` (or `docker compose down`). To wipe the database and start clean, run `docker compose down -v`. You need to do this once after pulling the storage changes, because the voter columns changed type.
 
 ### Try it
-1. **Register** (link on the login page) and scan the QR code with Google or Microsoft Authenticator. The QR code is only shown once.
-2. **Log in** with your username and password, then the 6-digit code.
-3. From the home page, **cast a vote** (a second vote is refused) or **view your registration history**. To change your name or address, go to `/registration/update-details`.
+1. **Load the electoral roll** (Req 20). Only people on the roll can register:
+   ```bash
+   docker compose exec web flask --app run import-roll data/sample_electoral_roll.csv
+   ```
+   The people in `data/sample_electoral_roll.csv` are made up. Register as one of them, using the same name, date of birth and ID number. Morgan Lee is marked not eligible, to show a refusal.
+2. **Register** (link on the login page) and scan the QR code with Google or Microsoft Authenticator. The QR code is only shown once.
+3. **Log in** with your username and password, then the 6-digit code.
+4. From the home page, **cast a vote** (a second vote is refused) or **view your registration history**. To change your name or address, go to `/registration/update-details`. The ballot has a House paper (number every box, Req 17) and a Senate paper (at least 6 boxes above the line or 12 below, Req 18). The server refuses an informal ballot without using it up, so the voter can fix it and resubmit.
+5. **Close the polls and count the votes** (Req 19), then open https://localhost/voting/results:
+   ```bash
+   docker compose exec web flask --app run close-polls
+   docker compose exec web flask --app run count-votes
+   ```
 
 Current demo values (hard-coded for now): the session ends after **60 seconds** idle (**10 seconds** on the update-details page), and **3 wrong passwords** within a minute lock the account for **5 seconds**.
 
@@ -42,6 +52,8 @@ Current demo values (hard-coded for now): the session ends after **60 seconds** 
 | Show the audit log (Req 9) | `docker compose exec db psql -U evoting evoting -c "SELECT entry_id, event_type, actor_id, prev_hash FROM audit_log;"` |
 | Follow the app's logs | `docker compose logs -f web` |
 | Health check (Req 22) | `curl -k https://localhost/health` |
+| Crash a count partway, then resume it (Req 19). Use instead of the first plain `count-votes`; needs at least 3 ballots | `docker compose exec web flask --app run count-votes --batch-size 1 --crash-after 2`, then run `count-votes` again |
+| Tamper with the saved count (Req 19). The results page then withholds the results, and the next `count-votes` detects the change and recounts | `docker compose exec db psql -U evoting evoting -c "UPDATE count_checkpoints SET ballots_counted = ballots_counted + 100;"` |
 
 ## Run without Docker (development only)
 
@@ -53,7 +65,7 @@ pip install -r requirements.txt
 python run.py
 ```
 
-Then open http://localhost:5000/auth/login. Delete `instance/dev.db` to start with an empty database.
+Then open http://localhost:5000/auth/login. Delete `instance/dev.db` to start with an empty database. Load the electoral roll first with `flask --app run import-roll data/sample_electoral_roll.csv`.
 
 ## Tests
 
@@ -74,8 +86,9 @@ This runs `tests/` and `app/storage/test_storage.py` on throwaway SQLite databas
 ```
 app/
   auth/            login, two-factor (TOTP), lockout, session timeout, login log, last login
-  registration/    enrolment, duplicate check, update details
-  voting/          one-time ballot tokens, one vote per voter, anonymous ballots, HTTPS only
+  registration/    enrolment, electoral roll check (eligibility.py), duplicate check, update details
+  voting/          one-time ballot tokens, one vote per voter, anonymous ballots, HTTPS only,
+                   ballot validation (validation.py), checkpointed count and results (counting.py)
   audit/           registration change history
   storage/         storage.py (Req 8–11), integration.py (connects it to the app),
                    backup.py + backup.Dockerfile (encrypted pg_dump)

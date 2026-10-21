@@ -1,8 +1,4 @@
-from app import create_app
-
-
-def test_health():
-    app = create_app()
-    client = app.test_client()
+def test_health(client):
+    # Uses the shared in-memory test database, not instance/dev.db.
     resp = client.get("/health")
     assert resp.status_code == 200

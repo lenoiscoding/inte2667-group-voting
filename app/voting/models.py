@@ -45,3 +45,28 @@ class Ballot(db.Model):
     election_id = db.Column(db.String(32), nullable=False)
     house_prefs = db.Column(db.Text, nullable=False)  # JSON {candidate: number}
     senate_prefs = db.Column(db.Text)  # for the Senate ballot (Req 18)
+
+
+class ElectionStatus(db.Model):
+    """Req 19: whether the polls are open. No row means they are open."""
+
+    __tablename__ = "election_status"
+
+    election_id = db.Column(db.String(32), primary_key=True)
+    polls_open = db.Column(db.Boolean, nullable=False, default=True)
+    closed_at = db.Column(db.String(32))
+
+
+class CountCheckpoint(db.Model):
+    """Req 19: the saved progress of a vote count (see app/voting/counting.py)."""
+
+    __tablename__ = "count_checkpoints"
+
+    election_id = db.Column(db.String(32), primary_key=True)
+    phase = db.Column(db.String(20), nullable=False)  # TALLYING or COMPLETE
+    ballots_counted = db.Column(db.Integer, nullable=False)
+    # Ballots are counted in ballot_id order; this is the last one counted.
+    last_ballot_id = db.Column(db.String(32))
+    state_json = db.Column(db.Text, nullable=False)  # running totals, then the result
+    updated_at = db.Column(db.String(32), nullable=False)
+    checkpoint_hmac = db.Column(db.String(64), nullable=False)

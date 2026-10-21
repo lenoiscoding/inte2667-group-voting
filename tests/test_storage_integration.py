@@ -1,5 +1,6 @@
 """Req 8, 9 and 11: Don's storage module working inside the app."""
 import os
+from datetime import date
 
 import pyotp
 import pytest
@@ -8,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import DatabaseError
 
 from app import create_app, db
-from app.registration.models import VoterRecord
+from app.registration.models import ElectoralRollEntry, VoterRecord
 from app.storage.integration import AuditLog, verify_chain
 from app.storage.storage import restore_snapshot, write_encrypted_snapshot
 
@@ -24,6 +25,11 @@ def client(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite://")  # fresh in-memory database
     app = create_app()
     with app.app_context():
+        # Req 20: Alice is on the electoral roll, so she can register.
+        db.session.add(ElectoralRollEntry(
+            id_document_number="AB123", full_name="Alice Smith",
+            date_of_birth=date(1990, 1, 1)))
+        db.session.commit()
         yield app.test_client()
         db.session.remove()
 

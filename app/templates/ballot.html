@@ -8,37 +8,87 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='css/login.css') }}"
     />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/ballot.css') }}"
+    />
   </head>
   <body>
-    <div class="login-container">
+    <div class="login-container{% if state == 'open' %} wide{% endif %}">
       <div class="login-box">
         <h1>Election System</h1>
 
         {% if state == "open" %}
-        <p class="subtitle">House of Representatives</p>
-        {% if message %}
-        <p class="security-reminder" role="alert">{{ message }}</p>
+        {% if errors %}
+        <div class="security-reminder ballot-errors" role="alert">
+          <strong>Your ballot has not been cast. Please fix:</strong>
+          <ul>
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
         {% endif %}
-        <p>
-          Number every box from 1 to {{ candidates | length }} in your order
-          of preference.
-        </p>
 
-        <form method="POST" action="{{ url_for('voting.cast_ballot') }}">
+        {# Req 17 and 18: the browser does no checking. The server validates
+           every ballot, so the rules cannot be skipped by editing the page. #}
+        <form method="POST" action="{{ url_for('voting.cast_ballot') }}" novalidate>
           <input type="hidden" name="ballot_token" value="{{ token }}" />
-          {% for name in candidates %}
-          <div class="input-group">
-            <label for="pref_{{ loop.index0 }}">{{ name }}</label>
-            <input
-              type="number"
-              id="pref_{{ loop.index0 }}"
-              name="pref_{{ loop.index0 }}"
-              min="1"
-              max="{{ candidates | length }}"
-              required
-            />
-          </div>
-          {% endfor %}
+
+          <fieldset class="ballot-paper">
+            <legend>House of Representatives</legend>
+            <p class="ballot-help">
+              Number every box from 1 to {{ candidates | length }} in your
+              order of preference.
+            </p>
+            {% for name in candidates %}
+            {% set field = "pref_" ~ loop.index0 %}
+            <div class="pref-box">
+              <input type="text" inputmode="numeric" maxlength="3" autocomplete="off"
+                     id="{{ field }}" name="{{ field }}" value="{{ values.get(field, '') }}" />
+              <label for="{{ field }}">{{ name }}</label>
+            </div>
+            {% endfor %}
+          </fieldset>
+
+          <fieldset class="ballot-paper">
+            <legend>Senate</legend>
+            <p class="ballot-help">
+              Vote <strong>either</strong> above the line, numbering at least
+              {{ policy.atl_minimum }} party boxes, <strong>or</strong> below
+              the line, numbering at least {{ policy.btl_minimum }} candidate boxes.
+            </p>
+
+            <h2 class="ballot-line">Above the line</h2>
+            <div class="box-grid">
+              {% for group in senate_groups %}
+              {% set field = "atl_" ~ group.code %}
+              <div class="pref-box">
+                <input type="text" inputmode="numeric" maxlength="3" autocomplete="off"
+                       id="{{ field }}" name="{{ field }}" value="{{ values.get(field, '') }}" />
+                <label for="{{ field }}">{{ group.code }} · {{ group.party }}</label>
+              </div>
+              {% endfor %}
+            </div>
+
+            <h2 class="ballot-line">Below the line</h2>
+            <div class="box-grid">
+              {% for group in senate_groups %}
+              <div>
+                <p class="group-name">{{ group.code }} · {{ group.party }}</p>
+                {% for member in group.candidates %}
+                {% set field = "btl_" ~ group.code ~ loop.index %}
+                <div class="pref-box">
+                  <input type="text" inputmode="numeric" maxlength="3" autocomplete="off"
+                         id="{{ field }}" name="{{ field }}" value="{{ values.get(field, '') }}" />
+                  <label for="{{ field }}">{{ member }}</label>
+                </div>
+                {% endfor %}
+              </div>
+              {% endfor %}
+            </div>
+          </fieldset>
+
           <button type="submit">Cast vote</button>
         </form>
 
@@ -48,11 +98,20 @@
           Your ballot was stored without your name or voter ID. It cannot be
           changed or cast again.
         </p>
+        {% if senate_note %}
+        <p class="ballot-help">{{ senate_note }}</p>
+        {% endif %}
 
         {% elif state == "used" %}
         <p class="subtitle">This ballot has already been used or has expired.</p>
         <p class="register-link">
           <a href="{{ url_for('voting.ballot') }}">Open my ballot again</a>
+        </p>
+
+        {% elif state == "closed" %}
+        <p class="subtitle">Voting has closed for this election.</p>
+        <p class="register-link">
+          <a href="{{ url_for('voting.results') }}">View the results</a>
         </p>
 
         {% else %}

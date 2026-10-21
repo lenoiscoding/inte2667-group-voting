@@ -41,7 +41,10 @@ def create_app():
     from app.auth.models.user import User
     from app.auth.models.login_attempt import LoginAttempt
     from app.audit.models import RegistrationChange
-    from app.voting.models import Ballot, BallotToken, VoterParticipation
+    from app.voting.models import (
+        Ballot, BallotToken, CountCheckpoint, ElectionStatus, VoterParticipation,
+    )
+    from app.registration.models import ElectoralRollEntry, VoterRecord
     from app.storage.integration import AuditLog, verify_audit_command
 
     # Import routes
@@ -72,6 +75,13 @@ def create_app():
 
     # Req 9: Verify the audit log through the Flask CLI.
     app.cli.add_command(verify_audit_command)
+
+    # Req 19 and 20: commands for election officials.
+    from app.registration.eligibility import import_roll_command
+    from app.voting.counting import close_polls_command, count_votes_command
+    app.cli.add_command(import_roll_command)
+    app.cli.add_command(close_polls_command)
+    app.cli.add_command(count_votes_command)
 
     # Create database tables
     with app.app_context():

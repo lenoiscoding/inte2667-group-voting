@@ -9,13 +9,18 @@ from sqlalchemy.exc import IntegrityError
 
 from app import db
 from app.registration.models import VoterRecord
-from app.voting.models import Ballot, BallotToken, VoterParticipation
+from app.voting.ballot_papers import (ELECTION_ID, HOUSE_CANDIDATES,
+                                      SENATE_CANDIDATES, SENATE_GROUPS,
+                                      SENATE_POLICY)
+from app.voting.counting import COMPLETE, checkpoint_is_valid, polls_open
+from app.voting.models import (Ballot, BallotToken, CountCheckpoint,
+                               VoterParticipation)
+from app.voting.validation import validate_house_ballot, validate_senate_ballot
 
 voting_bp = Blueprint("voting", __name__)
 
-ELECTION_ID = "FED2026"  # the prototype runs a single election
-HOUSE_CANDIDATES = ["Avery Brooks", "Jordan Lee", "Priya Nair", "Sam Walker"]
 SESSION_TIMEOUT_SECONDS = 60  # same idle limit as auth.home (Req 3)
+BALLOT_FIELDS = ("pref_", "atl_", "btl_")
 
 
 @voting_bp.before_request
@@ -67,37 +72,52 @@ def _issue_token(voter):
     return token
 
 
+def _show_ballot(token, values=None, errors=(), status=200):
+    return render_template(
+        "ballot.html", state="open", token=token, candidates=HOUSE_CANDIDATES,
+        senate_groups=SENATE_GROUPS, policy=SENATE_POLICY,
+        values=values or {}, errors=errors,
+    ), status
+
+
 @voting_bp.route("/ballot")
 def ballot():
     user_id = session.get("authenticated_user_id")
     if not user_id or time.time() - session.get("last_activity", 0) >= SESSION_TIMEOUT_SECONDS:
         session.clear()
         return redirect(url_for("auth.login"))
+    if not polls_open(ELECTION_ID):
+        return render_template("ballot.html", state="closed")
     voter = VoterRecord.query.filter_by(user_id=user_id).first_or_404()
 
     token = _issue_token(voter)
     if token is None:
         return render_template("ballot.html", state="voted")
-    return render_template(
-        "ballot.html", state="open", token=token, candidates=HOUSE_CANDIDATES
-    )
+    return _show_ballot(token)
 
 
 @voting_bp.route("/ballot", methods=["POST"])
 def cast_ballot():
     """Store a ballot. Only the one-time token is used, never the voter's identity."""
-    token = request.form.get("ballot_token", "")
-    try:
-        prefs = {
-            name: int(request.form[f"pref_{i}"])
-            for i, name in enumerate(HOUSE_CANDIDATES)
-        }
-    except (KeyError, ValueError):
-        return render_template(
-            "ballot.html", state="open", token=token, candidates=HOUSE_CANDIDATES,
-            message="Enter a number for every candidate.",
-        ), 400
-    # Formal checks on the numbering (an unbroken 1..N sequence) are Req 17.
+    if not polls_open(ELECTION_ID):  # Req 19: no ballots once counting can start
+        return render_template("ballot.html", state="closed"), 403
+
+    form = request.form
+    token = form.get("ballot_token", "")
+    house = validate_house_ballot(
+        {name: form.get(f"pref_{i}") for i, name in enumerate(HOUSE_CANDIDATES)})
+    senate = validate_senate_ballot(
+        {group["code"]: form.get(f"atl_{group['code']}") for group in SENATE_GROUPS},
+        {candidate_id: form.get(f"btl_{candidate_id}") for candidate_id in SENATE_CANDIDATES},
+        SENATE_POLICY,
+    )
+
+    # Req 17 and 18: the server decides whether a ballot is formal. Nothing is
+    # used up until both papers pass, so the voter can correct and resubmit.
+    errors = [result.message for result in (house, senate) if not result.valid]
+    if errors:
+        values = {key: value for key, value in form.items() if key.startswith(BALLOT_FIELDS)}
+        return _show_ballot(token, values, errors, 400)
 
     # Req 7: using up the token and saving the ballot happen in one
     # transaction, so a replayed or simultaneous submission finds no token.
@@ -108,6 +128,47 @@ def cast_ballot():
         db.session.rollback()
         return render_template("ballot.html", state="used"), 409
 
-    db.session.add(Ballot(election_id=ELECTION_ID, house_prefs=json.dumps(prefs)))
+    # Only formal preferences are stored; for the Senate, only the line that
+    # counts (Req 18). The count checks them again (Req 19).
+    db.session.add(Ballot(
+        election_id=ELECTION_ID,
+        house_prefs=json.dumps(_numbered(house.order)),
+        senate_prefs=json.dumps(
+            {"method": senate.method, "preferences": _numbered(senate.order)}),
+    ))
     db.session.commit()
-    return render_template("ballot.html", state="cast")
+    return render_template("ballot.html", state="cast", senate_note=_senate_note(senate))
+
+
+def _numbered(order):
+    """("B", "A", "C") -> {"B": 1, "A": 2, "C": 3}"""
+    return {key: number for number, key in enumerate(order, start=1)}
+
+
+def _senate_note(result):
+    if result.code.startswith("SENATE_DUAL"):
+        return result.message
+    line = "above the line" if result.method == "ATL" else "below the line"
+    return f"Your Senate vote was recorded {line}."
+
+
+@voting_bp.route("/results")
+def results():
+    """Req 19: results come only from a complete count whose checkpoint is intact."""
+    row = db.session.get(CountCheckpoint, ELECTION_ID)
+    if row is None or row.phase != COMPLETE:
+        return render_template("results.html", status="pending")
+    if not checkpoint_is_valid(row):
+        return render_template("results.html", status="tampered")
+    state = json.loads(row.state_json)
+    senate = sorted(
+        ((group["code"], group["party"], state["senate"].get(group["code"], 0))
+         for group in SENATE_GROUPS),
+        key=lambda item: -item[2],
+    )
+    return render_template(
+        "results.html", status="final", ballots_counted=row.ballots_counted,
+        house=state["result"], candidates=HOUSE_CANDIDATES, senate=senate,
+        senate_formal=sum(state["senate"].values()),
+        informal_house=state["informal_house"], informal_senate=state["informal_senate"],
+    )

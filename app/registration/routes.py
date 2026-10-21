@@ -22,6 +22,7 @@ from werkzeug.security import generate_password_hash
 from app.audit.models import RegistrationChange
 from app import db
 from app.auth.models.user import User
+from app.registration.eligibility import is_eligible
 from app.registration.models import VoterRecord
 from app.storage.integration import record_event
 
@@ -116,6 +117,16 @@ def register():
 
     if _age(dob) < MIN_AGE:
         return fail(f"You must be at least {MIN_AGE} to register.")
+
+    # Req 20: only people on the electoral roll can register. The message
+    # does not say which detail failed to match.
+    if not is_eligible(id_document_number, full_name, dob):
+        record_event("ELIGIBILITY_CHECK_FAILED", "unknown", ip=request.remote_addr)
+        return fail(
+            "These details do not match an eligible entry on the electoral roll. "
+            "Check that your name, date of birth and ID number match your enrolment.",
+            403,
+        )
 
     # Duplicate registration check.
     already_registered = (

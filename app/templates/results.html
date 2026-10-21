@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Election Results</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/login.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/ballot.css') }}"
+    />
+  </head>
+  <body>
+    <div class="login-container wide">
+      <div class="login-box">
+        <h1>Election Results</h1>
+
+        {% if status == "pending" %}
+        <p class="subtitle">Results are not available yet.</p>
+        <p class="ballot-help">
+          They are published once the polls have closed and the count is complete.
+        </p>
+
+        {% elif status == "tampered" %}
+        <p class="security-reminder" role="alert">
+          <strong>Results withheld</strong>
+          The saved count failed its integrity check, so it cannot be trusted.
+          An election official must run the count again.
+        </p>
+
+        {% else %}
+        <p class="subtitle">{{ ballots_counted }} ballots counted</p>
+
+        <h2 class="ballot-line">House of Representatives</h2>
+        {% if house.elected %}
+        <p><strong>Elected: {{ house.elected }}</strong></p>
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Candidate</th>
+              {% for rnd in house.rounds %}
+              <th class="number">Round {{ loop.index }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for name in candidates %}
+            <tr>
+              <td>{{ name }}</td>
+              {% for rnd in house.rounds %}
+              {% if name in rnd.votes %}
+              <td class="number{% if rnd.excluded == name %} excluded{% endif %}">{{ rnd.votes[name] }}</td>
+              {% else %}
+              <td class="number">–</td>
+              {% endif %}
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="ballot-help">
+          {{ house.formal_votes }} formal, {{ informal_house }} informal.
+          A struck-through total was excluded in that round, and those ballots
+          moved to each voter's next preference.
+        </p>
+        {% else %}
+        <p class="ballot-help">No formal House votes were cast.</p>
+        {% endif %}
+
+        <h2 class="ballot-line">Senate: first preferences by group</h2>
+        <table class="results-table">
+          <thead>
+            <tr><th>Group</th><th class="number">Votes</th><th class="number">%</th></tr>
+          </thead>
+          <tbody>
+            {% for code, party, votes in senate %}
+            <tr>
+              <td>{{ code }} · {{ party }}</td>
+              <td class="number">{{ votes }}</td>
+              <td class="number">{{ "%.1f" | format(100 * votes / senate_formal) if senate_formal else "0.0" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="ballot-help">
+          {{ senate_formal }} formal, {{ informal_senate }} informal. A full
+          Senate quota count is outside this prototype.
+        </p>
+        {% endif %}
+
+        <p class="register-link">
+          <a href="{{ url_for('auth.home') }}">Return to Home Page</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
