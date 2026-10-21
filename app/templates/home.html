@@ -40,6 +40,11 @@
         <section class="home-section">
           <h2>Registration Security</h2>
           <p>
+            <a href="{{ url_for('registration.update_details') }}">
+              Update Registration Details
+            </a>
+          </p>
+          <p>
             <a href="{{ url_for('audit.registration_history') }}">
               View Registration Change History
             </a>
