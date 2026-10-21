@@ -50,6 +50,6 @@
     <p>
         <a href="{{ url_for('auth.home') }}">Return to Home Page</a>
     </p>
-    <script src="{{ url_for('static', filename='js/session_timeout.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/session_timeout.js') }}" data-timeout-seconds="{{ config.SESSION_TIMEOUT_SECONDS }}"></script>
 </body>
 </html>

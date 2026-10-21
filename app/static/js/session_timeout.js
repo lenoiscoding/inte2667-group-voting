@@ -1,3 +1,7 @@
+// Req 3: go back to the login page after the server's idle time
+// (SESSION_TIMEOUT_SECONDS), which the <script> tag passes in.
+const IDLE_MS = Number(document.currentScript.dataset.timeoutSeconds || 900) * 1000;
+
 let timeout;
 let lastPing = 0;
 
@@ -6,7 +10,7 @@ function resetTimer() {
 
   timeout = setTimeout(() => {
     window.location.href = "/auth/login";
-  }, 60000);
+  }, IDLE_MS);
 }
 
 function recordActivity() {

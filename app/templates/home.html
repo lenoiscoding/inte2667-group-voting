@@ -24,7 +24,7 @@
           {% if previous_successful_login %}
           <p>
             Your previous successful login was:
-            <time>{{ previous_successful_login }}</time>
+            <time datetime="{{ previous_successful_login | utc_iso }}">{{ previous_successful_login | utc_text }}</time>
           </p>
           {% else %}
           <p>No previous successful login has been recorded.</p>
@@ -50,9 +50,14 @@
             </a>
           </p>
         </section>
+
+        <form method="POST" action="{{ url_for('auth.logout') }}" class="logout-form">
+          <button type="submit">Log out</button>
+        </form>
       </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/session_timeout.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/session_timeout.js') }}" data-timeout-seconds="{{ config.SESSION_TIMEOUT_SECONDS }}"></script>
+    <script src="{{ url_for('static', filename='js/local_time.js') }}"></script>
   </body>
 </html>

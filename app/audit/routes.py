@@ -1,4 +1,3 @@
-import time
 from flask import (
     Blueprint,
     jsonify,
@@ -8,6 +7,7 @@ from flask import (
     url_for,
 )
 from app.audit.models import RegistrationChange
+from app.auth.session_guard import active_user_id
 from app.registration.models import VoterRecord
 
 audit_bp = Blueprint("audit", __name__)
@@ -18,17 +18,9 @@ def ping():
 
 @audit_bp.route("/registration-history")
 def registration_history():
-    user_id = session.get("authenticated_user_id")
-    last_activity = session.get("last_activity", 0)
-
-    # Require an authenticated session.
+    # Req 3: logged in and not idle for too long.
+    user_id = active_user_id()
     if not user_id:
-        session.clear()
-        return redirect(url_for("auth.login"))
-
-
-    if time.time() - last_activity >= 60:
-        session.clear()
         return redirect(url_for("auth.login"))
 
     voter = VoterRecord.query.filter_by(user_id=user_id).first()

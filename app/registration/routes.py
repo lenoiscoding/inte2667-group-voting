@@ -5,7 +5,6 @@ from io import BytesIO
 import base64
 import pyotp
 import qrcode
-import time
 
 from flask import (
     Blueprint,
@@ -22,6 +21,7 @@ from werkzeug.security import generate_password_hash
 from app.audit.models import RegistrationChange
 from app import db
 from app.auth.models.user import User
+from app.auth.session_guard import active_user_id
 from app.registration.eligibility import is_eligible
 from app.registration.models import VoterRecord
 from app.storage.integration import record_event
@@ -189,17 +189,9 @@ def register():
 
 @registration_bp.route("/update-details", methods=["GET", "POST"])
 def update_details():
-    user_id = session.get("authenticated_user_id")
-    last_activity = session.get("last_activity", 0)
-
-    # Require an authenticated session.
+    # Req 3: logged in and not idle for too long.
+    user_id = active_user_id()
     if not user_id:
-        session.clear()
-        return redirect(url_for("auth.login"))
-
-    # Use the team's 60-second inactivity timeout.
-    if time.time() - last_activity >= 60:
-        session.clear()
         return redirect(url_for("auth.login"))
 
     voter = VoterRecord.query.filter_by(user_id=user_id).first()

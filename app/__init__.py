@@ -1,5 +1,7 @@
 
 import os
+from datetime import datetime, timezone
+
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
@@ -9,6 +11,15 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 db = SQLAlchemy()
 jwt = JWTManager()
+
+
+def _as_utc(value):
+    """A datetime (or ISO string) as timezone-aware UTC. SQLite drops the zone."""
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def create_app():
@@ -25,9 +36,22 @@ def create_app():
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    # Security configuration
+    # Security configuration. Behind the TLS proxy is the real deployment, so
+    # never fall back to the development keys there.
+    if os.environ.get("BEHIND_TLS_PROXY") == "1":
+        missing = [name for name in ("SECRET_KEY", "JWT_SECRET_KEY", "AES_KEY")
+                   if not os.environ.get(name)]
+        if missing:
+            raise RuntimeError("Set these in .env before starting: " + ", ".join(missing))
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev")
     app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev")
+    # The session cookie is not sent with cross-site form posts (CSRF).
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+    # Req 2 and 3: the report's values unless .env sets shorter ones for a demo.
+    for name, default in (("SESSION_TIMEOUT_SECONDS", 900), ("LOCKOUT_MAX_ATTEMPTS", 5),
+                          ("LOCKOUT_WINDOW_SECONDS", 600), ("LOCKOUT_SECONDS", 900)):
+        app.config[name] = int(os.environ.get(name) or default)
 
     # Req 6: Trust the nginx TLS proxy when running behind it.
     if os.environ.get("BEHIND_TLS_PROXY") == "1":
@@ -92,6 +116,12 @@ def create_app():
     # Create database tables
     with app.app_context():
         db.create_all()
+
+    # Timestamps go to the page in UTC; static/js/local_time.js then shows
+    # them in the viewer's own time zone.
+    app.add_template_filter(lambda value: _as_utc(value).isoformat(), "utc_iso")
+    app.add_template_filter(
+        lambda value: _as_utc(value).strftime("%d %b %Y, %H:%M UTC"), "utc_text")
 
     @app.route("/health")
     def health():

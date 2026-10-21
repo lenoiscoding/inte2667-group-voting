@@ -1,13 +1,13 @@
 import hashlib
 import json
 import secrets
-import time
 
 from flask import (Blueprint, abort, current_app, jsonify, redirect,
                    render_template, request, session, url_for)
 from sqlalchemy.exc import IntegrityError
 
 from app import db
+from app.auth.session_guard import active_user_id
 from app.registration.models import VoterRecord
 from app.voting.ballot_papers import (ELECTION_ID, HOUSE_CANDIDATES,
                                       SENATE_CANDIDATES, SENATE_GROUPS,
@@ -19,7 +19,6 @@ from app.voting.validation import validate_house_ballot, validate_senate_ballot
 
 voting_bp = Blueprint("voting", __name__)
 
-SESSION_TIMEOUT_SECONDS = 60  # same idle limit as auth.home (Req 3)
 BALLOT_FIELDS = ("pref_", "atl_", "btl_")
 
 
@@ -82,9 +81,8 @@ def _show_ballot(token, values=None, errors=(), status=200):
 
 @voting_bp.route("/ballot")
 def ballot():
-    user_id = session.get("authenticated_user_id")
-    if not user_id or time.time() - session.get("last_activity", 0) >= SESSION_TIMEOUT_SECONDS:
-        session.clear()
+    user_id = active_user_id()  # Req 3
+    if not user_id:
         return redirect(url_for("auth.login"))
     if not polls_open(ELECTION_ID):
         return render_template("ballot.html", state="closed")

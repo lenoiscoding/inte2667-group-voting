@@ -22,8 +22,13 @@ services:
       # Req 21: the web app logs in as the least-privilege role, never as the owner.
       DATABASE_URL: "postgresql+psycopg2://evoting_app:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}@db:5432/evoting"
       BEHIND_TLS_PROXY: "1"
-      # Req 8/11: AES-256 key (64 hex chars). Blank = built-in test key.
-      AES_KEY: "${AES_KEY:-}"
+      # Req 8/11: AES-256 key (64 hex characters). Required.
+      AES_KEY: "${AES_KEY:?Set AES_KEY in .env}"
+      # Req 2 and 3: the report's values unless .env shortens them for a demo.
+      SESSION_TIMEOUT_SECONDS: "${SESSION_TIMEOUT_SECONDS:-900}"
+      LOCKOUT_MAX_ATTEMPTS: "${LOCKOUT_MAX_ATTEMPTS:-5}"
+      LOCKOUT_WINDOW_SECONDS: "${LOCKOUT_WINDOW_SECONDS:-600}"
+      LOCKOUT_SECONDS: "${LOCKOUT_SECONDS:-900}"
       # Req 13: optional email settings (blank = no email).
       MAIL_SERVER: "${MAIL_SERVER:-}"
       MAIL_PORT: "${MAIL_PORT:-587}"
@@ -56,7 +61,7 @@ services:
     environment:
       SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in .env}"  # same as web: signs the count (Req 19)
       JWT_SECRET_KEY: "${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}"
-      AES_KEY: "${AES_KEY:-}"  # same as web: encrypts the electoral roll (Req 8, 20)
+      AES_KEY: "${AES_KEY:?Set AES_KEY in .env}"  # same as web: encrypts the electoral roll (Req 8, 20)
       DATABASE_URL: "postgresql+psycopg2://evoting:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/evoting"
       APP_DB_PASSWORD: "${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}"
     depends_on:
@@ -90,7 +95,7 @@ services:
     profiles: ["tools"]
     environment:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
-      AES_KEY: "${AES_KEY:-}"
+      AES_KEY: "${AES_KEY:?Set AES_KEY in .env}"
     volumes:
       - ./backups:/backups
     depends_on:

@@ -1,0 +1,16 @@
+# Keep secrets and local data out of the Docker images. Without this, `COPY . .`
+# would put .env (including the database owner's password) inside the web
+# container, undoing Req 21.
+.env
+.env.*
+!.env.example
+.git
+.github
+instance/
+backups/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+**/.DS_Store
