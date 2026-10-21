@@ -19,7 +19,8 @@ services:
     environment:
       SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in .env}"
       JWT_SECRET_KEY: "${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}"
-      DATABASE_URL: "postgresql+psycopg2://evoting:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/evoting"
+      # Req 21: the web app logs in as the least-privilege role, never as the owner.
+      DATABASE_URL: "postgresql+psycopg2://evoting_app:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}@db:5432/evoting"
       BEHIND_TLS_PROXY: "1"
       # Req 8/11: AES-256 key (64 hex chars). Blank = built-in test key.
       AES_KEY: "${AES_KEY:-}"
@@ -32,13 +33,37 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      admin:
+        condition: service_completed_successfully  # Req 21: tables and grants exist first
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      # Req 22: /health also checks the database. If it fails 3 times in a
+      # row, interrupt the app (Python stops the server on SIGINT); the app
+      # exits and the restart policy above starts it again within seconds.
+      test: ["CMD-SHELL", "curl -fsS --max-time 3 --retry 2 --retry-delay 2 --retry-all-errors http://localhost:5000/health > /dev/null || kill -INT 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
       start_period: 20s
+
+  # Req 21: runs as the database owner (the admin role). On `docker compose up`
+  # it creates any missing tables and grants evoting_app only what the web app
+  # needs, then exits. Election officials run their commands with it too:
+  #   docker compose run --rm admin flask --app run count-votes
+  admin:
+    build: .
+    command: ["flask", "--app", "run", "init-db"]
+    environment:
+      SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in .env}"  # same as web: signs the count (Req 19)
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}"
+      AES_KEY: "${AES_KEY:-}"  # same as web: encrypts the electoral roll (Req 8, 20)
+      DATABASE_URL: "postgresql+psycopg2://evoting:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/evoting"
+      APP_DB_PASSWORD: "${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      disable: true
 
   db:
     image: postgres:16-alpine

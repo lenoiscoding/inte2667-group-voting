@@ -2,6 +2,8 @@
 import os
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from flask_jwt_extended import JWTManager
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -83,12 +85,23 @@ def create_app():
     app.cli.add_command(close_polls_command)
     app.cli.add_command(count_votes_command)
 
+    # Req 21: create the tables and the web app's least-privilege database role.
+    from app.security.db_roles import init_db_command
+    app.cli.add_command(init_db_command)
+
     # Create database tables
     with app.app_context():
         db.create_all()
 
     @app.route("/health")
     def health():
+        # Req 22: healthy only if the database answers too. Docker's
+        # healthcheck calls this and restarts the app if it keeps failing.
+        try:
+            db.session.execute(text("SELECT 1"))
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify(status="error"), 503
         return jsonify(status="ok")
 
     return app
